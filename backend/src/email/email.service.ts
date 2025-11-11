@@ -1,69 +1,88 @@
-import { Injectable } from '@nestjs/common';
-const sgMail = require('@sendgrid/mail');
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import SendGrid from '@sendgrid/mail';
 
 @Injectable()
 export class EmailService {
   constructor() {
-    const apiKey = process.env.SENDGRID_API_KEY || '';
-    if (!apiKey) {
-      throw new Error('SENDGRID_API_KEY saknas i miljövariabler!');
+    if (!process.env.SENDGRID_API_KEY) {
+      throw new Error('SENDGRID_API_KEY saknas i miljövariablerna');
     }
-    sgMail.setApiKey(apiKey);
+    SendGrid.setApiKey(process.env.SENDGRID_API_KEY);
   }
 
-  async sendPasswordReset(email: string, token: string) {
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-
+  // 🔹 Hjälpfunktion för att skicka mejl
+  private async sendMail(to: string, subject: string, html: string) {
     const msg = {
-      to: email,
-      from: process.env.SENDGRID_FROM || 'no-reply@westwallet.local',
-      subject: 'Återställ ditt lösenord',
-      text: `Hej! Klicka på länken för att återställa ditt lösenord: ${resetLink}`,
-      html: `
-        <h1>Återställ ditt lösenord</h1>
-        <p>Klicka på länken nedan för att välja ett nytt lösenord:</p>
-        <a href="${resetLink}">${resetLink}</a>
-        <p>Om du inte bad om detta kan du ignorera mejlet.</p>
-      `,
+      to,
+      from: process.env.SENDGRID_FROM_EMAIL || 'no-reply@dinapp.se',
+      subject,
+      html,
     };
 
     try {
-      await sgMail.send(msg);
-        console.log(`🟢 Återställningsmail skickat till ${email}`);
-    } catch (error) {
-      console.error(
-        '🔴 Fel vid utskick av återställningsmail:',
-        error.response?.body || error.message,
-      );
-      throw error;
+      await SendGrid.send(msg);
+    } catch (err) {
+      console.error('Fel vid utskick av mejl:', err);
+      throw new InternalServerErrorException('Misslyckades med att skicka mejl.');
     }
   }
 
-  async sendVerificationEmail(email: string, token: string) {
-    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
+  // 🔹 Skicka verifieringsmejl (uppdaterad till GET-länk)
+  async sendVerificationEmail(to: string, token: string) {
+    const verifyUrl = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/auth/verify-email?token=${token}`;
 
-    const msg = {
-      to: email,
-      from: process.env.SENDGRID_FROM || 'no-reply@westwallet.local',
-      subject: 'Bekräfta din e-postadress',
-      text: `Hej! Klicka på länken för att bekräfta din e-postadress: ${verifyLink}`,
-      html: `
-        <h1>Välkommen till WestWallet</h1>
-        <p>Klicka på länken nedan för att bekräfta din e-postadress:</p>
-        <a href="${verifyLink}">${verifyLink}</a>
-        <p>Om du inte skapade ett konto kan du ignorera mejlet.</p>
-      `,
-    };
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <h2>Verifiera din e-postadress</h2>
+        <p>Tack för att du registrerade dig! Klicka på länken nedan för att verifiera din e-postadress:</p>
+        <p>
+          <a href="${verifyUrl}" 
+             style="background-color: #4CAF50; color: white; padding: 10px 16px; text-decoration: none; border-radius: 5px;">
+             Verifiera e-post
+          </a>
+        </p>
+        <p>Om knappen inte fungerar, kopiera länken nedan och klistra in i din webbläsare:</p>
+        <p style="word-break: break-all;">${verifyUrl}</p>
+        <hr />
+        <p style="font-size: 12px; color: gray;">Den här länken är giltig i 24 timmar.</p>
+      </div>
+    `;
 
-    try {
-      await sgMail.send(msg);
-        console.log(`🟢 Verifieringsmail skickat till ${email}`);
-    } catch (error) {
-      console.error(
-        '🔴 Fel vid utskick av verifieringsmail:',
-        error.response?.body || error.message,
-      );
-      throw error;
-    }
+    await this.sendMail(to, 'Verifiera din e-postadress', html);
+  }
+
+  // 🔹 Skicka återställningsmejl
+  async sendPasswordReset(to: string, token: string) {
+    const resetUrl = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <h2>Återställ ditt lösenord</h2>
+        <p>Klicka på länken nedan för att återställa ditt lösenord:</p>
+        <p>
+          <a href="${resetUrl}" 
+             style="background-color: #007BFF; color: white; padding: 10px 16px; text-decoration: none; border-radius: 5px;">
+             Återställ lösenord
+          </a>
+        </p>
+        <p>Om knappen inte fungerar, kopiera länken nedan och klistra in i din webbläsare:</p>
+        <p style="word-break: break-all;">${resetUrl}</p>
+        <hr />
+        <p style="font-size: 12px; color: gray;">Länken är giltig i 15 minuter.</p>
+      </div>
+    `;
+
+    await this.sendMail(to, 'Återställ ditt lösenord', html);
+  }
+
+  // 🔹 Skicka enkel notifiering (ex. till admin)
+  async sendNotification(to: string, subject: string, message: string) {
+    const html = `
+      <div style="font-family: Arial, sans-serif;">
+        <p>${message}</p>
+      </div>
+    `;
+
+    await this.sendMail(to, subject, html);
   }
 }

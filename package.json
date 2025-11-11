@@ -2,7 +2,9 @@
   "dependencies": {
     "@nestjs/jwt": "^11.0.1",
     "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.8",
     "@nestjs/swagger": "^11.2.1",
+    "@sendgrid/mail": "^8.1.6",
     "ioredis": "^5.8.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
