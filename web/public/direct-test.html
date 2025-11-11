@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Direct API Test</title>
+</head>
+<body>
+  <h1>Testing API Connection</h1>
+  <button onclick="test()">Click to Test Register</button>
+  <pre id="result"></pre>
+  
+  <script>
+    async function test() {
+      const result = document.getElementById('result');
+      result.textContent = 'Testing...';
+      
+      try {
+        const response = await fetch('http://localhost:3000/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: 'browsertest' + Date.now(),
+            password: 'test123'
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        result.textContent = 'SUCCESS!\n\n' + JSON.stringify(data, null, 2);
+        result.style.color = 'green';
+      } catch (error) {
+        result.textContent = 'ERROR!\n\n' + error.toString() + '\n\n' + error.stack;
+        result.style.color = 'red';
+        console.error('Full error:', error);
+      }
+    }
+    
+    // Auto-test on load
+    window.onload = () => setTimeout(test, 500);
+  </script>
+</body>
+</html>

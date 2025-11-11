@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+  "module": "nodenext",
+  "moduleResolution": "nodenext",
+  "jsx": "react-jsx",
+  "jsxImportSource": "react",
     "resolvePackageJsonExports": true,
     "esModuleInterop": true,
     "isolatedModules": true,

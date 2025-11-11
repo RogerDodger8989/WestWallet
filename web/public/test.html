@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>WestWallet Test</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: 50px auto; padding: 20px; background: #1a1a2e; color: #fff; }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; font-size: 16px; }
+    button { background: #16c79a; color: #fff; border: none; cursor: pointer; }
+    button:hover { background: #13a67a; }
+    .result { margin-top: 20px; padding: 10px; background: #0f3460; border-radius: 5px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>WestWallet API Test</h1>
+  
+  <h2>Register</h2>
+  <input id="reg-user" placeholder="Username" value="testuser123">
+  <input id="reg-pass" type="password" placeholder="Password" value="password">
+  <button onclick="testRegister()">Register</button>
+  
+  <h2>Login</h2>
+  <input id="login-user" placeholder="Username" value="testuser123">
+  <input id="login-pass" type="password" placeholder="Password" value="password">
+  <button onclick="testLogin()">Login</button>
+  
+  <div id="result" class="result">Results will appear here...</div>
+  
+  <script>
+    const API_URL = 'http://localhost:3000';
+    
+    async function testRegister() {
+      const username = document.getElementById('reg-user').value;
+      const password = document.getElementById('reg-pass').value;
+      const result = document.getElementById('result');
+      
+      try {
+        result.textContent = 'Registering...';
+        const response = await fetch(`${API_URL}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        result.textContent = 'Register Success:\n' + JSON.stringify(data, null, 2);
+        result.style.background = '#0a5';
+      } catch (error) {
+        result.textContent = 'Register Error:\n' + error.message;
+        result.style.background = '#a05';
+      }
+    }
+    
+    async function testLogin() {
+      const username = document.getElementById('login-user').value;
+      const password = document.getElementById('login-pass').value;
+      const result = document.getElementById('result');
+      
+      try {
+        result.textContent = 'Logging in...';
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        result.textContent = 'Login Success:\n' + JSON.stringify(data, null, 2);
+        result.style.background = '#0a5';
+        
+        if (data.access_token) {
+          localStorage.setItem('token', data.access_token);
+        }
+      } catch (error) {
+        result.textContent = 'Login Error:\n' + error.message;
+        result.style.background = '#a05';
+      }
+    }
+  </script>
+</body>
+</html>

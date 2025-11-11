@@ -8,6 +8,7 @@
     "ioredis": "^5.8.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "react-router-dom": "^7.9.5",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {

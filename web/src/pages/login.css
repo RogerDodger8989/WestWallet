@@ -1,0 +1,5 @@
+.login-root{display:flex;align-items:center;justify-content:center;height:100vh;background:#0f1724;color:#fff}
+.login-card{background:#0b1220;padding:28px;border-radius:8px;min-width:320px}
+.login-card input{display:block;width:100%;padding:10px;margin:8px 0;border-radius:4px;border:1px solid #233}
+.login-card button{display:block;width:100%;padding:10px;margin-top:8px;background:#16c79a;border:none;border-radius:6px;color:#fff}
+.login-card .link{background:transparent;color:#cbe}
