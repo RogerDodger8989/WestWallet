@@ -6,121 +6,158 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
 import { JwtService } from '@nestjs/jwt';
+import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
 import { UserDocument } from '../users/schemas/user.schema';
+import { addTokenToBlacklist } from './token-blacklist.store';
 
 interface JwtPayload {
   sub: string;
   email: string;
+  role: string;
 }
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly emailService: EmailService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   // Registrera ny användare
   async register(email: string, password: string) {
     const existing = await this.usersService.findByEmail(email);
     if (existing) {
-      throw new ConflictException('E-postadressen är redan registrerad');
+      throw new ConflictException('E-postadressen används redan');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const verificationToken = uuidv4();
+
     const user = await this.usersService.createUser(email, hashedPassword);
 
-    const token = uuidv4();
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await this.usersService.setVerificationToken((user._id as any).toString(), token, expires);
-    await this.emailService.sendVerificationEmail(email, token);
+    // Skicka verifieringsmejl
+    await this.emailService.sendVerificationEmail(email, verificationToken);
 
-    return { message: 'Registrering lyckades. Kontrollera din e-post för verifiering.' };
+    return { message: 'Användare skapad. Kontrollera din e-post för verifiering.' };
   }
 
-  // Glömt lösenord
+  // Verifiera e-post via token
+  async verifyEmail(token: string) {
+    const user = await this.usersService.findByVerificationToken(token);
+    if (!user) {
+      throw new BadRequestException('Ogiltig eller föråldrad verifieringslänk');
+    }
+
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  await user.save();
+
+    return { message: 'E-post verifierad. Du kan nu logga in.' };
+  }
+
+  // Skicka länk för glömt lösenord
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);
-    if (!user) throw new NotFoundException('Ingen användare med den e-postadressen');
+    if (!user) {
+      throw new NotFoundException('Ingen användare med denna e-postadress');
+    }
 
-    const token = uuidv4();
-    const expires = new Date(Date.now() + 60 * 60 * 1000);
-  await this.usersService.setResetPasswordToken((user._id as any).toString(), token, expires);
-    await this.emailService.sendPasswordReset(email, token);
-    return { message: 'Återställningslänk skickad till e-postadressen.' };
+    const resetToken = uuidv4();
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 1000 * 60 * 15); // 15 min
+    await user.save();
+
+  await this.emailService.sendPasswordReset(email, resetToken);
+    return { message: 'Återställningslänk skickad till e-post.' };
   }
 
   // Återställ lösenord
   async resetPassword(token: string, newPassword: string) {
-    const user = await this.usersService.findByResetPasswordToken(token);
+  const user = await this.usersService.findByResetPasswordToken(token);
     if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
-      throw new BadRequestException('Ogiltigt eller utgånget token');
+      throw new BadRequestException('Ogiltig eller föråldrad token');
     }
 
-    const hash = await bcrypt.hash(newPassword, 10);
-  await this.usersService.updatePassword((user._id as any).toString(), hash);
-  await this.usersService.clearResetPasswordToken((user._id as any).toString());
-    return { message: 'Lösenord uppdaterat' };
-  }
-
-  // Verifiera e-post
-  async verifyEmail(token: string) {
-    const user = await this.usersService.findByVerificationToken(token);
-    if (!user || !user.verificationTokenExpires || user.verificationTokenExpires < new Date()) {
-      throw new BadRequestException('Ogiltigt eller utgånget token');
-    }
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpires = undefined;
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
     await user.save();
-    return { message: 'E-post verifierad. Du kan nu logga in.' };
+
+    return { message: 'Lösenordet har uppdaterats.' };
   }
 
-  // Validera användare
-  async validateUser(email: string, password: string): Promise<UserDocument | null> {
-    const user = await this.usersService.findByEmail(email);
-    if (!user) return null;
-    if (!user.isVerified) throw new BadRequestException('E-posten är inte verifierad.');
-    const match = await bcrypt.compare(password, user.password);
-    return match ? user : null;
-  }
-
-  // Login – skapar både access & refresh token
+  // Login
   async login(user: UserDocument) {
-  const userId = (user._id as any).toString();
-    const payload: JwtPayload = { sub: userId, email: user.email };
+    const payload: JwtPayload = {
+      sub: (user._id as any).toString(),
+      email: user.email,
+      role: user.role,
+    };
 
-    const accessToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_SECRET || 'dev-secret',
-      expiresIn: process.env.JWT_EXPIRES_IN ? Number(process.env.JWT_EXPIRES_IN) : 3600,
+    const accessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '15m',
     });
 
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
-      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ? Number(process.env.JWT_REFRESH_EXPIRES_IN) : 604800,
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '7d',
     });
 
-    await this.usersService.updateRefreshToken(userId, refreshToken);
-    return { access_token: accessToken, refresh_token: refreshToken };
+    await this.usersService.updateRefreshToken((user._id as any).toString(), refreshToken);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: {
+        id: (user._id as any).toString(),
+        email: user.email,
+        role: user.role,
+      },
+    };
   }
 
-  // Byt ut tokens via refresh token
+  // Validera användare vid login
+  async validateUser(email: string, password: string): Promise<UserDocument> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) throw new UnauthorizedException('Fel e-post eller lösenord');
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) throw new UnauthorizedException('Fel e-post eller lösenord');
+
+    if (!user.isVerified)
+      throw new UnauthorizedException('Kontot är inte verifierat ännu');
+
+    return user;
+  }
+
+  // Byt refresh token mot nya tokens
   async refreshTokens(userId: string, refreshToken: string) {
-    const isValid = await this.usersService.validateRefreshToken(userId, refreshToken);
+    const isValid = await this.usersService.validateRefreshToken(
+      userId,
+      refreshToken,
+    );
     if (!isValid) throw new UnauthorizedException('Ogiltig refresh token');
+
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException('Användaren hittades inte');
+
     return this.login(user);
   }
 
-  // Logout
-  async logout(userId: string) {
+  // Logout – rensar refresh-token OCH svartlistar access-token
+  async logout(userId: string, accessToken?: string) {
     await this.usersService.removeRefreshToken(userId);
+
+    if (accessToken) {
+      addTokenToBlacklist(accessToken);
+    }
+
     return { message: 'Utloggad' };
   }
 }
+

@@ -29,6 +29,11 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec();
   }
 
+  // Hitta användare via resetPasswordToken
+  async findByResetPasswordToken(token: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ resetPasswordToken: token }).exec();
+  }
+
   // Hitta användare via ID
   async findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
@@ -85,12 +90,6 @@ export class UsersService {
       resetPasswordToken: token,
       resetPasswordExpires: expires,
     });
-  }
-
-  async findByResetPasswordToken(
-    token: string,
-  ): Promise<UserDocument | null> {
-    return this.userModel.findOne({ resetPasswordToken: token }).exec();
   }
 
   async clearResetPasswordToken(userId: string): Promise<void> {
