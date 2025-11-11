@@ -7,7 +7,6 @@ import { UsersModule } from '../users/users.module';
 import { EmailModule } from '../email/email.module';
 import { JwtStrategy } from './jwt.strategy';
 import { jwtConstants } from './jwt.constants';
-import { RolesGuard } from './roles.guard';
 
 @Module({
   imports: [
@@ -17,7 +16,10 @@ import { RolesGuard } from './roles.guard';
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: {
-        expiresIn: process.env.JWT_EXPIRES_IN ? Number(process.env.JWT_EXPIRES_IN) : 3600,
+        // du använder numeriskt värde i koden (sekunder)
+        expiresIn: process.env.JWT_EXPIRES_IN
+          ? Number(process.env.JWT_EXPIRES_IN)
+          : 3600,
       },
     }),
   ],

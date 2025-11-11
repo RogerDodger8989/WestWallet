@@ -34,7 +34,7 @@ export class UsersService {
     return this.userModel.findById(id).exec();
   }
 
-  // Lista alla användare (admin)
+  // Lista alla användare (för admin)
   async findAll(): Promise<UserDocument[]> {
     return this.userModel.find().exec();
   }
@@ -50,7 +50,7 @@ export class UsersService {
     return user.save();
   }
 
-  // Hantera verifieringstoken
+  // Verifieringstoken
   async setVerificationToken(
     userId: string,
     token: string,
@@ -62,7 +62,9 @@ export class UsersService {
     });
   }
 
-  async findByVerificationToken(token: string): Promise<UserDocument | null> {
+  async findByVerificationToken(
+    token: string,
+  ): Promise<UserDocument | null> {
     return this.userModel.findOne({ verificationToken: token }).exec();
   }
 
@@ -73,7 +75,7 @@ export class UsersService {
     });
   }
 
-  // Hantera reset-token
+  // Reset-lösenordstoken
   async setResetPasswordToken(
     userId: string,
     token: string,
@@ -85,7 +87,9 @@ export class UsersService {
     });
   }
 
-  async findByResetPasswordToken(token: string): Promise<UserDocument | null> {
+  async findByResetPasswordToken(
+    token: string,
+  ): Promise<UserDocument | null> {
     return this.userModel.findOne({ resetPasswordToken: token }).exec();
   }
 

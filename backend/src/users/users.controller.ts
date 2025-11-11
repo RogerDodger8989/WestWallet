@@ -12,13 +12,19 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // Inloggad användare hämtar sin profil
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user', 'admin')
   @ApiBearerAuth()
@@ -28,6 +34,7 @@ export class UsersController {
   async getMe(@Req() req: any) {
     const user = await this.usersService.findById(req.user.userId);
     if (!user) return { message: 'Användare hittades inte' };
+
     const obj = user.toObject();
     delete obj.password;
     delete obj.refreshTokenHash;
@@ -35,9 +42,11 @@ export class UsersController {
     delete obj.resetPasswordExpires;
     delete obj.verificationToken;
     delete obj.verificationTokenExpires;
+
     return obj;
   }
 
+  // Endast admin: lista alla användare
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
@@ -53,6 +62,7 @@ export class UsersController {
     }));
   }
 
+  // Endast admin: ändra roll
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
@@ -65,6 +75,7 @@ export class UsersController {
     if (!['user', 'admin'].includes(role)) {
       throw new BadRequestException('Ogiltig roll');
     }
+
     const updated = await this.usersService.updateUserRole(userId, role);
     return { id: updated._id, email: updated.email, role: updated.role };
   }

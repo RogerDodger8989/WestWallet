@@ -29,7 +29,7 @@ export class User {
   @Prop()
   refreshTokenHash?: string;
 
-  // 👇 nytt fält för roller
+  // 👇 roll: user/admin
   @Prop({ default: 'user', enum: ['user', 'admin'] })
   role: string;
 }

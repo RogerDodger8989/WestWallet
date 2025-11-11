@@ -17,8 +17,9 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
 
+    // Om ingen roll är satt på endpointen → släpp igenom
     if (!requiredRoles || requiredRoles.length === 0) {
-      return true; // ingen roll krävs
+      return true;
     }
 
     const { user } = context.switchToHttp().getRequest();
