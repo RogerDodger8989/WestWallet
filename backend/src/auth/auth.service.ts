@@ -27,7 +27,7 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-  // Registrera ny användare
+  // Registrera ny användare (med e-postverifiering)
   async register(email: string, password: string) {
     const existing = await this.usersService.findByEmail(email);
     if (existing) {
@@ -37,24 +37,42 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = uuidv4();
 
+    // Skapa användaren
     const user = await this.usersService.createUser(email, hashedPassword);
+
+    // Sätt verifieringstoken + giltighetstid (t.ex. 24h)
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
+    await this.usersService.setVerificationToken(
+      (user._id as any).toString(),
+      verificationToken,
+      expires,
+    );
 
     // Skicka verifieringsmejl
     await this.emailService.sendVerificationEmail(email, verificationToken);
 
-    return { message: 'Användare skapad. Kontrollera din e-post för verifiering.' };
+    return {
+      message: 'Användare skapad. Kontrollera din e-post för verifiering.',
+    };
   }
 
   // Verifiera e-post via token
   async verifyEmail(token: string) {
     const user = await this.usersService.findByVerificationToken(token);
-    if (!user) {
+
+    // Kontrollera att token finns och inte har gått ut
+    if (
+      !user ||
+      !user.verificationTokenExpires ||
+      user.verificationTokenExpires < new Date()
+    ) {
       throw new BadRequestException('Ogiltig eller föråldrad verifieringslänk');
     }
 
-  user.isVerified = true;
-  user.verificationToken = undefined;
-  await user.save();
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+    await user.save();
 
     return { message: 'E-post verifierad. Du kan nu logga in.' };
   }
@@ -71,14 +89,18 @@ export class AuthService {
     user.resetPasswordExpires = new Date(Date.now() + 1000 * 60 * 15); // 15 min
     await user.save();
 
-  await this.emailService.sendPasswordReset(email, resetToken);
+    await this.emailService.sendPasswordReset(email, resetToken);
     return { message: 'Återställningslänk skickad till e-post.' };
   }
 
   // Återställ lösenord
   async resetPassword(token: string, newPassword: string) {
-  const user = await this.usersService.findByResetPasswordToken(token);
-    if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
+    const user = await this.usersService.findByResetPasswordToken(token);
+    if (
+      !user ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < new Date()
+    ) {
       throw new BadRequestException('Ogiltig eller föråldrad token');
     }
 
@@ -90,7 +112,7 @@ export class AuthService {
     return { message: 'Lösenordet har uppdaterats.' };
   }
 
-  // Login
+  // Login – generera access- och refresh-tokens
   async login(user: UserDocument) {
     const payload: JwtPayload = {
       sub: (user._id as any).toString(),
@@ -108,7 +130,10 @@ export class AuthService {
       expiresIn: '7d',
     });
 
-    await this.usersService.updateRefreshToken((user._id as any).toString(), refreshToken);
+    await this.usersService.updateRefreshToken(
+      (user._id as any).toString(),
+      refreshToken,
+    );
 
     return {
       access_token: accessToken,
@@ -121,16 +146,24 @@ export class AuthService {
     };
   }
 
-  // Validera användare vid login
-  async validateUser(email: string, password: string): Promise<UserDocument> {
+  // Validera användare vid login (inkl. e-postverifiering)
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<UserDocument> {
     const user = await this.usersService.findByEmail(email);
-    if (!user) throw new UnauthorizedException('Fel e-post eller lösenord');
+    if (!user) {
+      throw new UnauthorizedException('Fel e-post eller lösenord');
+    }
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new UnauthorizedException('Fel e-post eller lösenord');
+    if (!valid) {
+      throw new UnauthorizedException('Fel e-post eller lösenord');
+    }
 
-    if (!user.isVerified)
+    if (!user.isVerified) {
       throw new UnauthorizedException('Kontot är inte verifierat ännu');
+    }
 
     return user;
   }
@@ -141,10 +174,14 @@ export class AuthService {
       userId,
       refreshToken,
     );
-    if (!isValid) throw new UnauthorizedException('Ogiltig refresh token');
+    if (!isValid) {
+      throw new UnauthorizedException('Ogiltig refresh token');
+    }
 
     const user = await this.usersService.findById(userId);
-    if (!user) throw new UnauthorizedException('Användaren hittades inte');
+    if (!user) {
+      throw new UnauthorizedException('Användaren hittades inte');
+    }
 
     return this.login(user);
   }
@@ -160,4 +197,3 @@ export class AuthService {
     return { message: 'Utloggad' };
   }
 }
-
