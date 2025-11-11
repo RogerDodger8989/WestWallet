@@ -32,6 +32,13 @@ export class User {
   // 👇 roll: user/admin
   @Prop({ default: 'user', enum: ['user', 'admin'] })
   role: string;
+
+  // Mongoose timestamps
+  @Prop()
+  createdAt?: Date;
+
+  @Prop()
+  updatedAt?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

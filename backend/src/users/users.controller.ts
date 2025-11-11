@@ -6,37 +6,33 @@ import {
   Patch,
   Param,
   Body,
-  BadRequestException,
   Delete,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UsersService } from './users.service';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
 
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // Inloggad användare hämtar sin profil
+  // Hämta inloggad användare
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user', 'admin')
   @ApiBearerAuth()
   @Get('me')
-  @ApiOperation({ summary: 'Hämta inloggad användare' })
-  @ApiResponse({ status: 200, description: 'Returnerar användardata' })
+  @ApiOperation({ summary: 'Hämta aktuell användares profil' })
+  @ApiResponse({ status: 200, description: 'Returnerar användarens information' })
   async getMe(@Req() req: any) {
     const user = await this.usersService.findById(req.user.userId);
-    if (!user) return { message: 'Användare hittades inte' };
+    if (!user) throw new NotFoundException('Användaren hittades inte');
 
-    const obj = user.toObject();
+    const obj = user.toObject ? user.toObject() : user;
     delete obj.password;
     delete obj.refreshTokenHash;
     delete obj.resetPasswordToken;
@@ -47,7 +43,7 @@ export class UsersController {
     return obj;
   }
 
-  // Endast admin: lista alla användare
+  // Lista alla användare (endast admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
@@ -60,16 +56,18 @@ export class UsersController {
       email: u.email,
       role: u.role,
       verified: u.isVerified,
+      createdAt: u.createdAt,
     }));
   }
 
-  // Endast admin: ändra roll
+  // Ändra roll (endast admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @Patch(':id/role')
-  @ApiOperation({ summary: 'Ändra roll för användare (endast admin)' })
-  async updateUserRole(
+  @ApiOperation({ summary: 'Ändra roll på användare (endast admin)' })
+  @ApiResponse({ status: 200, description: 'Roll uppdaterad' })
+  async updateRole(
     @Param('id') userId: string,
     @Body('role') role: string,
   ) {
@@ -78,35 +76,38 @@ export class UsersController {
     }
 
     const updated = await this.usersService.updateUserRole(userId, role);
-    return { id: updated._id, email: updated.email, role: updated.role };
+    return {
+      id: updated._id,
+      email: updated.email,
+      role: updated.role,
+    };
   }
 
-  // Endast admin: ta bort användare
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @ApiBearerAuth()
-  @Delete(':id')
-  @ApiOperation({ summary: 'Ta bort användare (endast admin)' })
-  @ApiResponse({ status: 200, description: 'Användaren har tagits bort' })
-  async deleteUser(@Param('id') userId: string) {
-    await this.usersService.deleteUser(userId);
-    return { message: 'Användaren har tagits bort' };
-  }
-
-  // Endast admin: manuellt verifiera användare
+  // Markera som verifierad (endast admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @Patch(':id/verify')
-  @ApiOperation({ summary: 'Manuellt verifiera användare (endast admin)' })
-  @ApiResponse({ status: 200, description: 'Användaren har verifierats' })
+  @ApiOperation({ summary: 'Markera användare som verifierad (endast admin)' })
+  @ApiResponse({ status: 200, description: 'Användare verifierad' })
   async verifyUser(@Param('id') userId: string) {
     const updated = await this.usersService.verifyUserManually(userId);
     return {
       id: updated._id,
       email: updated.email,
-      role: updated.role,
       verified: updated.isVerified,
     };
+  }
+
+  // Ta bort användare (endast admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @Delete(':id')
+  @ApiOperation({ summary: 'Ta bort användare (endast admin)' })
+  @ApiResponse({ status: 200, description: 'Användare borttagen' })
+  async deleteUser(@Param('id') userId: string) {
+    await this.usersService.deleteUser(userId);
+    return { message: 'Användaren har tagits bort' };
   }
 }
