@@ -8,6 +8,8 @@ import { EmailModule } from '../email/email.module';
 import { JwtStrategy } from './jwt.strategy';
 import { jwtConstants } from './jwt.constants';
 
+import { RefreshTokenGuard } from './refresh-token.guard';
+
 @Module({
   imports: [
     UsersModule,
@@ -24,7 +26,7 @@ import { jwtConstants } from './jwt.constants';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, RefreshTokenGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -2,19 +2,16 @@ import {
   Controller,
   Post,
   Body,
-  BadRequestException,
+  Req,
   UseGuards,
   Get,
-  Req,
+  Query,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { RefreshTokenGuard } from './refresh-token.guard';
+import type { Request } from 'express';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -22,86 +19,67 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @ApiOperation({ summary: 'Registrera ny användare' })
+  @ApiOperation({
+    summary: 'Registrera ny användare (skickar verifieringsmail)',
+  })
   async register(@Body() body: { email: string; password: string }) {
-    const { email, password } = body;
-    if (!email || !password)
-      throw new BadRequestException('E-post och lösenord krävs');
-    return this.authService.register(email, password);
+    return this.authService.register(body.email, body.password);
   }
 
   @Post('verify')
-  @ApiOperation({ summary: 'Verifiera e-post via token' })
+  @ApiOperation({ summary: 'Verifiera e-post (via POST, token i body)' })
   async verifyEmail(@Body() body: { token: string }) {
-    if (!body.token) throw new BadRequestException('Token krävs');
     return this.authService.verifyEmail(body.token);
   }
 
-  @Post('login')
-  @ApiOperation({ summary: 'Logga in och få tokens' })
-  async login(@Body() body: { email: string; password: string }) {
-    const { email, password } = body;
-    if (!email || !password)
-      throw new BadRequestException('E-post och lösenord krävs');
+  @Get('verify-email')
+  @ApiOperation({
+    summary: 'Verifiera e-post direkt via länk (GET /auth/verify-email?token=...)',
+  })
+  async verifyEmailDirect(@Query('token') token: string) {
+    return this.authService.verifyEmail(token);
+  }
 
-    const user = await this.authService.validateUser(email, password);
+  @Post('login')
+  @ApiOperation({ summary: 'Logga in och få access/refresh tokens' })
+  async login(@Body() body: { email: string; password: string }) {
+    const user = await this.authService.validateUser(body.email, body.password);
     return this.authService.login(user);
   }
 
   @Post('forgot-password')
-  @ApiOperation({ summary: 'Begär återställning av lösenord' })
+  @ApiOperation({ summary: 'Skicka återställningslänk för lösenord' })
   async forgotPassword(@Body() body: { email: string }) {
-    if (!body.email) throw new BadRequestException('E-post krävs');
     return this.authService.forgotPassword(body.email);
   }
 
   @Post('reset-password')
   @ApiOperation({ summary: 'Återställ lösenord via token' })
-  async resetPassword(@Body() body: { token: string; password: string }) {
-    const { token, password } = body;
-    if (!token || !password)
-      throw new BadRequestException('Token och nytt lösenord krävs');
-    return this.authService.resetPassword(token, password);
+  async resetPassword(
+    @Body() body: { token: string; newPassword: string },
+  ) {
+    return this.authService.resetPassword(body.token, body.newPassword);
   }
 
+  @UseGuards(RefreshTokenGuard)
   @Post('refresh')
-  @ApiOperation({
-    summary: 'Byt ut access/refresh tokens med giltig refresh token',
-  })
-  async refresh(@Body() body: { userId: string; refresh_token: string }) {
-    const { userId, refresh_token } = body;
-    if (!userId || !refresh_token)
-      throw new BadRequestException('userId och refresh_token krävs');
-    return this.authService.refreshTokens(userId, refresh_token);
+  @ApiOperation({ summary: 'Förnya access token med refresh token' })
+  async refreshTokens(@Req() req: any) {
+    const userId = req.user.sub;
+    const refreshToken = req.user.refreshToken;
+    return this.authService.refreshTokens(userId, refreshToken);
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('logout')
   @ApiOperation({
-    summary: 'Logga ut användare (rensa refresh-token & svartlista access-token)',
+    summary: 'Logga ut (svartlistar token och rensar refresh)',
   })
-  async logout(@Req() req: any) {
-    const authHeader: string | undefined =
-      req.headers?.authorization || req.headers?.Authorization;
-
-    let accessToken: string | undefined;
-
-    if (authHeader && typeof authHeader === 'string') {
-      const parts = authHeader.split(' ');
-      if (parts.length === 2 && parts[0] === 'Bearer') {
-        accessToken = parts[1];
-      }
-    }
-
-    return this.authService.logout(req.user.userId, accessToken);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Get('me')
-  @ApiOperation({ summary: 'Hämta information om inloggad användare' })
-  async getMe(@Req() req: any) {
-    return req.user;
+  async logout(@Req() req: Request) {
+    const authHeader = req.headers['authorization'];
+    const accessToken = authHeader?.split(' ')[1];
+    const user = req.user as any;
+    return this.authService.logout(user.sub, accessToken);
   }
 }

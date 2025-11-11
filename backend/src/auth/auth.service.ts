@@ -27,7 +27,7 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-  // Registrera ny användare (med e-postverifiering)
+  // Registrera användare och skicka verifieringsmejl
   async register(email: string, password: string) {
     const existing = await this.usersService.findByEmail(email);
     if (existing) {
@@ -37,10 +37,8 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = uuidv4();
 
-    // Skapa användaren
     const user = await this.usersService.createUser(email, hashedPassword);
 
-    // Sätt verifieringstoken + giltighetstid (t.ex. 24h)
     const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
     await this.usersService.setVerificationToken(
       (user._id as any).toString(),
@@ -48,7 +46,6 @@ export class AuthService {
       expires,
     );
 
-    // Skicka verifieringsmejl
     await this.emailService.sendVerificationEmail(email, verificationToken);
 
     return {
@@ -59,8 +56,6 @@ export class AuthService {
   // Verifiera e-post via token
   async verifyEmail(token: string) {
     const user = await this.usersService.findByVerificationToken(token);
-
-    // Kontrollera att token finns och inte har gått ut
     if (
       !user ||
       !user.verificationTokenExpires ||
@@ -77,7 +72,7 @@ export class AuthService {
     return { message: 'E-post verifierad. Du kan nu logga in.' };
   }
 
-  // Skicka länk för glömt lösenord
+  // Glömt lösenord
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
@@ -86,7 +81,7 @@ export class AuthService {
 
     const resetToken = uuidv4();
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = new Date(Date.now() + 1000 * 60 * 15); // 15 min
+    user.resetPasswordExpires = new Date(Date.now() + 1000 * 60 * 15);
     await user.save();
 
     await this.emailService.sendPasswordReset(email, resetToken);
@@ -112,7 +107,7 @@ export class AuthService {
     return { message: 'Lösenordet har uppdaterats.' };
   }
 
-  // Login – generera access- och refresh-tokens
+  // Inloggning och tokenhantering
   async login(user: UserDocument) {
     const payload: JwtPayload = {
       sub: (user._id as any).toString(),
@@ -146,29 +141,21 @@ export class AuthService {
     };
   }
 
-  // Validera användare vid login (inkl. e-postverifiering)
-  async validateUser(
-    email: string,
-    password: string,
-  ): Promise<UserDocument> {
+  // Validera användare
+  async validateUser(email: string, password: string): Promise<UserDocument> {
     const user = await this.usersService.findByEmail(email);
-    if (!user) {
-      throw new UnauthorizedException('Fel e-post eller lösenord');
-    }
+    if (!user) throw new UnauthorizedException('Fel e-post eller lösenord');
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      throw new UnauthorizedException('Fel e-post eller lösenord');
-    }
+    if (!valid) throw new UnauthorizedException('Fel e-post eller lösenord');
 
-    if (!user.isVerified) {
+    if (!user.isVerified)
       throw new UnauthorizedException('Kontot är inte verifierat ännu');
-    }
 
     return user;
   }
 
-  // Byt refresh token mot nya tokens
+  // Förnya tokens
   async refreshTokens(userId: string, refreshToken: string) {
     const isValid = await this.usersService.validateRefreshToken(
       userId,
@@ -179,21 +166,15 @@ export class AuthService {
     }
 
     const user = await this.usersService.findById(userId);
-    if (!user) {
-      throw new UnauthorizedException('Användaren hittades inte');
-    }
+    if (!user) throw new UnauthorizedException('Användaren hittades inte');
 
     return this.login(user);
   }
 
-  // Logout – rensar refresh-token OCH svartlistar access-token
+  // Logout
   async logout(userId: string, accessToken?: string) {
     await this.usersService.removeRefreshToken(userId);
-
-    if (accessToken) {
-      addTokenToBlacklist(accessToken);
-    }
-
+    if (accessToken) addTokenToBlacklist(accessToken);
     return { message: 'Utloggad' };
   }
 }
