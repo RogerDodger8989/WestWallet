@@ -30,7 +30,9 @@ export class UsersService {
   }
 
   // Hitta användare via resetPasswordToken
-  async findByResetPasswordToken(token: string): Promise<UserDocument | null> {
+  async findByResetPasswordToken(
+    token: string,
+  ): Promise<UserDocument | null> {
     return this.userModel.findOne({ resetPasswordToken: token }).exec();
   }
 
@@ -130,6 +132,28 @@ export class UsersService {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('Användaren hittades inte');
     user.role = role;
+    return user.save();
+  }
+
+  // 🗑️ Ta bort användare (admin)
+  async deleteUser(userId: string): Promise<void> {
+    const deleted = await this.userModel.findByIdAndDelete(userId).exec();
+    if (!deleted) {
+      throw new NotFoundException('Användaren hittades inte');
+    }
+  }
+
+  // ✅ Manuell verifiering av användare (admin)
+  async verifyUserManually(userId: string): Promise<UserDocument> {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Användaren hittades inte');
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+
     return user.save();
   }
 }
