@@ -1,0 +1,46 @@
+# ---- Node ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Build output ----
+dist/
+build/
+
+# ---- Environment ----
+.env
+.env.local
+.env.development
+.env.production
+
+# ---- Logs ----
+logs/
+*.log
+*.log.*
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ---- Cache & temp ----
+.cache/
+.tmp/
+temp/
+*.tmp
+coverage/
+
+# ---- IDE / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- TypeScript ----
+*.tsbuildinfo
+*.d.ts
+*.js.map
+
+# ---- Misc ----
+/*.swp
+/.env.example
