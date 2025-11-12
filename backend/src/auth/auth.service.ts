@@ -144,14 +144,23 @@ export class AuthService {
   // Validera användare
   async validateUser(email: string, password: string): Promise<UserDocument> {
     const user = await this.usersService.findByEmail(email);
-    if (!user) throw new UnauthorizedException('Fel e-post eller lösenord');
-
+    console.log('Login attempt:', { email, password });
+    if (!user) {
+      console.log('Ingen användare hittades med e-post:', email);
+      throw new UnauthorizedException('Fel e-post eller lösenord');
+    }
+    console.log('Hittad användare:', { email: user.email, hash: user.password, isVerified: user.isVerified });
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new UnauthorizedException('Fel e-post eller lösenord');
-
-    if (!user.isVerified)
+    console.log('Bcrypt compare:', { input: password, hash: user.password, result: valid });
+    if (!valid) {
+      console.log('Lösenordet matchar inte!');
+      throw new UnauthorizedException('Fel e-post eller lösenord');
+    }
+    if (!user.isVerified) {
+      console.log('Användaren är inte verifierad!');
       throw new UnauthorizedException('Kontot är inte verifierat ännu');
-
+    }
+    console.log('Login OK!');
     return user;
   }
 

@@ -6,14 +6,14 @@ import { BankImportPreview } from '../components/BankImportPreview';
 import { useAuth } from '../AuthContext';
 
 interface Category {
-  id: number;
+  _id: string;
   name: string;
 }
 
 interface Supplier {
-  id: number;
+  id: string;
   name: string;
-  categoryId: number;
+  categoryId: string;
 }
 
 interface Expense {
@@ -23,8 +23,8 @@ interface Expense {
   amount: number;
   type: 'expense' | 'income';
   month: string;
-  categoryId: number;
-  supplierId: number;
+  categoryId: string;
+  supplierId: string;
   notes?: string;
   images?: string[];
   category: Category;
@@ -45,7 +45,7 @@ export function Expenses() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income'>('all');
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   // const [monthPickerValue, setMonthPickerValue] = useState<string>('');
   
@@ -58,8 +58,8 @@ export function Expenses() {
     name: '',
     amount: '',
     type: 'expense' as 'expense' | 'income',
-    categoryId: 0,
-    supplierId: 0,
+    categoryId: '',
+  supplierId: '',
     notes: '',
     month: '' // Använd för redigering
   });
@@ -69,7 +69,7 @@ export function Expenses() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   // Inline row edit state
   const [rowEditingId, setRowEditingId] = useState<number | null>(null);
-  const [rowEdit, setRowEdit] = useState<{ amount: string; categoryId: number }>({ amount: '', categoryId: 0 });
+  const [rowEdit, setRowEdit] = useState<{ amount: string; categoryId: string }>({ amount: '', categoryId: '' });
   
   // Multi-month selection
   const [selectedMonths, setSelectedMonths] = useState<string[]>(() => {
@@ -87,7 +87,7 @@ export function Expenses() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSupplier, setNewSupplier] = useState({
     name: '',
-    categoryId: 0
+    categoryId: ''
   });
   
   // Toast notification state
@@ -133,7 +133,7 @@ export function Expenses() {
   const [importing, setImporting] = useState(false);
   // Budgets state
   const [budgets, setBudgets] = useState<any[]>([]);
-  const [newBudget, setNewBudget] = useState<{ categoryId: number; monthlyLimit: string; startMonth?: string; endMonth?: string }>({ categoryId: 0, monthlyLimit: '' });
+  const [newBudget, setNewBudget] = useState<{ categoryId: string; monthlyLimit: string; startMonth?: string; endMonth?: string }>({ categoryId: '', monthlyLimit: '' });
   // UI: collapsible sections
   const [showBudgetPanel, setShowBudgetPanel] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -228,7 +228,8 @@ export function Expenses() {
 
   const loadBudgets = async () => {
     try {
-      const res = await api.get('/budgets/category');
+      if (!formData.categoryId) return;
+      const res = await api.get(`/budgets/category/${formData.categoryId}`);
       setBudgets(res.data);
     } catch (e) {
       // Ignorera fel
@@ -296,7 +297,7 @@ export function Expenses() {
       amount: String(Math.abs(expense.amount)),
       type: expense.type,
       categoryId: expense.categoryId,
-      supplierId: expense.supplierId,
+  supplierId: String(expense.supplierId),
       notes: expense.notes || '',
       month: expense.month
     });
@@ -356,7 +357,7 @@ export function Expenses() {
         notes: exp.notes || undefined,
         tags: exp.tags || []
       });
-      setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, amount: finalAmount, categoryId: rowEdit.categoryId, category: categories.find(c=>c.id===rowEdit.categoryId) || e.category } : e));
+  setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, amount: finalAmount, categoryId: rowEdit.categoryId, category: categories.find(c=>c._id===rowEdit.categoryId) || e.category } : e));
       setRowEditingId(null);
       setToast({ message: 'Post uppdaterad', type: 'success' });
     } catch (err) {
@@ -695,8 +696,8 @@ export function Expenses() {
       name: '',
       amount: '',
       type: 'expense',
-      categoryId: 0,
-      supplierId: 0,
+  categoryId: '',
+  supplierId: '',
       notes: '',
       month: ''
     });
@@ -719,7 +720,7 @@ export function Expenses() {
     try {
       const response = await api.post('/categories', { name: newCategoryName });
       await loadCategories();
-      setFormData({...formData, categoryId: response.data.id, supplierId: 0});
+  setFormData({...formData, categoryId: response.data.id, supplierId: ''});
       setNewCategoryName('');
       setShowCategoryModal(false);
       setToast({ message: `Kategori "${newCategoryName}" skapad!`, type: 'success' });
@@ -732,12 +733,12 @@ export function Expenses() {
   // Hantera snabb-tillägg av leverantör
   const handleQuickAddSupplier = async () => {
     if (!newSupplier.name.trim() || !newSupplier.categoryId) return;
-    
     try {
-      const response = await api.post('/suppliers', newSupplier);
+      // Skicka korrekt payload till backend
+      const response = await api.post('/suppliers', { name: newSupplier.name, category: newSupplier.categoryId });
       await loadSuppliers();
       setFormData({...formData, supplierId: response.data.id});
-      setNewSupplier({ name: '', categoryId: 0 });
+  setNewSupplier({ name: '', categoryId: '' });
       setShowSupplierModal(false);
       setToast({ message: `Leverantör "${newSupplier.name}" skapad!`, type: 'success' });
     } catch (error: any) {
@@ -747,7 +748,7 @@ export function Expenses() {
   };
 
   const filteredSuppliers = formData.categoryId
-    ? suppliers.filter(s => s.categoryId === formData.categoryId)
+    ? suppliers.filter(s => s.category === formData.categoryId)
     : suppliers;
 
   // Generate 12 months for selected year
@@ -797,11 +798,11 @@ export function Expenses() {
 
   // Anomali-beräkning per kategori (endast utgifter). Kräver minst 4 poster i kategorin.
   const categoryStats = (() => {
-    const map: Record<number, { sum: number; count: number; mean: number }> = {};
+  const map: Record<string, { sum: number; count: number; mean: number }> = {};
     filteredExpenses.forEach(e => {
       if (e.type !== 'expense') return;
       const absAmt = Math.abs(e.amount);
-      const entry = map[e.categoryId] || (map[e.categoryId] = { sum: 0, count: 0, mean: 0 });
+  const entry = map[e.categoryId as string] || (map[e.categoryId as string] = { sum: 0, count: 0, mean: 0 });
       entry.sum += absAmt;
       entry.count += 1;
     });
@@ -811,7 +812,7 @@ export function Expenses() {
 
   const isAnomaly = (e: Expense) => {
     if (e.type !== 'expense') return false;
-    const stats = categoryStats[e.categoryId];
+  const stats = categoryStats[e.categoryId as string];
     if (!stats || stats.count < 4) return false;
     const absAmt = Math.abs(e.amount);
     return absAmt > stats.mean * 2; // Enkel heuristik
@@ -873,7 +874,7 @@ export function Expenses() {
                 startMonth: newBudget.startMonth || undefined,
                 endMonth: newBudget.endMonth || undefined,
               });
-              setNewBudget({ categoryId: 0, monthlyLimit: '' });
+          setNewBudget({ categoryId: '', monthlyLimit: '' });
               loadBudgets();
               setToast({ message: 'Budget skapad', type: 'success' });
             } catch (err) {
@@ -885,11 +886,11 @@ export function Expenses() {
           <div className="md:col-span-2">
             <select
               value={newBudget.categoryId}
-              onChange={(e)=>setNewBudget({...newBudget, categoryId: parseInt(e.target.value)})}
+              onChange={(e)=>setNewBudget({...newBudget, categoryId: e.target.value})}
               className="select-field w-full"
             >
-              <option value={0}>Välj kategori</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value={''}>Välj kategori</option>
+              {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
             </select>
           </div>
           <div>
@@ -922,7 +923,7 @@ export function Expenses() {
           </div>
           <div className="md:col-span-5 flex gap-3">
             <button type="submit" className="btn-primary flex-1" disabled={!newBudget.categoryId || !newBudget.monthlyLimit}>Spara budget</button>
-            <button type="button" onClick={()=>setNewBudget({ categoryId: 0, monthlyLimit: '' })} className="btn-secondary">Rensa</button>
+            <button type="button" onClick={()=>setNewBudget({ categoryId: '', monthlyLimit: '' })} className="btn-secondary">Rensa</button>
           </div>
         </form>
         <div className="space-y-4">
@@ -1018,12 +1019,12 @@ export function Expenses() {
                   Alla
                 </button>
                 {categories.map(cat => {
-                  const active = selectedCategoryIds.includes(cat.id);
+                  const active = selectedCategoryIds.includes(cat._id);
                   return (
                     <button
-                      key={cat.id}
+                      key={cat._id}
                       type="button"
-                      onClick={() => setSelectedCategoryIds(prev => active ? prev.filter(id => id !== cat.id) : [...prev, cat.id])}
+                      onClick={() => setSelectedCategoryIds(prev => active ? prev.filter(id => id !== cat._id) : [...prev, cat._id])}
                       className={`px-3 py-1.5 rounded-full text-sm border ${active ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'}`}
                     >
                       {cat.name}
@@ -1304,15 +1305,15 @@ export function Expenses() {
                 <select
                   value={formData.categoryId}
                   onChange={(e) => {
-                    const catId = parseInt(e.target.value);
-                    setFormData({...formData, categoryId: catId, supplierId: 0});
+                    const catId = e.target.value;
+                setFormData({...formData, categoryId: catId, supplierId: ''});
                   }}
                   className="select-field flex-1"
                   required
                 >
-                  <option value="0">Välj kategori</option>
+                  <option value="">Välj kategori</option>
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    <option key={cat._id} value={cat._id}>{cat.name}</option>
                   ))}
                 </select>
                 <button
@@ -1334,7 +1335,7 @@ export function Expenses() {
               <div className="flex gap-2">
                 <select
                   value={formData.supplierId}
-                  onChange={(e) => setFormData({...formData, supplierId: parseInt(e.target.value)})}
+                  onChange={(e) => setFormData({...formData, supplierId: e.target.value})}
                   className="select-field flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   required
                   disabled={!formData.categoryId}
@@ -1438,12 +1439,12 @@ export function Expenses() {
                 Alla
               </button>
               {categories.map(cat => {
-                const active = selectedCategoryIds.includes(cat.id);
+                const active = selectedCategoryIds.includes(cat._id);
                 return (
                   <button
-                    key={cat.id}
+                    key={cat._id}
                     type="button"
-                    onClick={() => setSelectedCategoryIds(prev => active ? prev.filter(id => id !== cat.id) : [...prev, cat.id])}
+                    onClick={() => setSelectedCategoryIds(prev => active ? prev.filter(id => id !== cat._id) : [...prev, cat._id])}
                     className={`px-3 py-1.5 rounded-full text-sm border ${active ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'}`}
                   >
                     {cat.name}
@@ -1578,7 +1579,7 @@ export function Expenses() {
               autoFocus
             />
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Kategori: <span className="font-semibold">{categories.find(c => c.id === newSupplier.categoryId)?.name}</span>
+              Kategori: <span className="font-semibold">{categories.find(c => c._id === newSupplier.categoryId)?.name}</span>
             </p>
             <div className="flex gap-3">
               <button
@@ -1591,7 +1592,7 @@ export function Expenses() {
               <button
                 onClick={() => {
                   setShowSupplierModal(false);
-                  setNewSupplier({ name: '', categoryId: 0 });
+                  setNewSupplier({ name: '', categoryId: '' });
                 }}
                 className="btn-secondary flex-1"
               >
@@ -1732,11 +1733,11 @@ export function Expenses() {
                       {rowEditingId === expense.id ? (
                         <select
                           value={rowEdit.categoryId}
-                          onChange={(e)=>setRowEdit(prev=>({...prev, categoryId: parseInt(e.target.value)}))}
+                          onChange={(e)=>setRowEdit(prev=>({...prev, categoryId: e.target.value}))}
                           className="select-field"
                         >
                           {categories.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                            <option key={c._id} value={c._id}>{c.name}</option>
                           ))}
                         </select>
                       ) : (

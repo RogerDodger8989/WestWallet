@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import api, { importRulesAPI } from '../api/api';
 
 interface Category {
-  id: number;
+  _id: string;
   name: string;
 }
 
 interface Supplier {
-  id: number;
+  id: string;
   name: string;
-  categoryId: number;
+  categoryId: string;
 }
 
 interface Transaction {
@@ -17,8 +17,8 @@ interface Transaction {
   description: string;
   amount: number;
   reference?: string;
-  suggestedCategoryId?: number;
-  suggestedSupplierId?: number;
+  suggestedCategoryId?: string;
+  suggestedSupplierId?: string;
   isDuplicate: boolean;
 }
 
@@ -57,33 +57,33 @@ export function BankImportPreview({
       ...t,
       id: index,
       selected: !t.isDuplicate,
-      categoryId: t.suggestedCategoryId || 0,
-      supplierId: t.suggestedSupplierId || 0,
+      categoryId: t.suggestedCategoryId ? String(t.suggestedCategoryId) : '',
+      supplierId: t.suggestedSupplierId ? String(t.suggestedSupplierId) : '',
       matchedRulePattern: undefined as string | undefined,
     }))
   );
   // Bulk action temporary selections
-  const [bulkCategoryId, setBulkCategoryId] = useState<number>(0);
-  const [bulkSupplierId, setBulkSupplierId] = useState<number>(0);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
+  const [bulkSupplierId, setBulkSupplierId] = useState<string>('');
   
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newSupplier, setNewSupplier] = useState({ name: '', categoryId: 0 });
+  const [newSupplier, setNewSupplier] = useState<{ name: string; categoryId: string }>({ name: '', categoryId: '' });
   // Row context for inline add (+) so we can auto-select newly created item
-  const [categoryRowContext, setCategoryRowContext] = useState<number | null>(null);
-  const [supplierRowContext, setSupplierRowContext] = useState<number | null>(null);
+  const [categoryRowContext, setCategoryRowContext] = useState<string | null>(null);
+  const [supplierRowContext, setSupplierRowContext] = useState<string | null>(null);
   // Import rules state
   const [rules, setRules] = useState<any[]>([]);
   const [showRuleModal, setShowRuleModal] = useState(false);
-  const [newRule, setNewRule] = useState<{ pattern: string; categoryId?: number; supplierId?: number }>({ pattern: '' });
+  const [newRule, setNewRule] = useState<{ pattern: string; categoryId?: string; supplierId?: string }>({ pattern: '' });
   const [ruleModalCreatingCategory, setRuleModalCreatingCategory] = useState(false);
   const [ruleModalCreatingSupplier, setRuleModalCreatingSupplier] = useState(false);
   const [ruleModalNewCategoryName, setRuleModalNewCategoryName] = useState('');
-  const [ruleModalNewSupplier, setRuleModalNewSupplier] = useState<{ name: string; categoryId: number | 0 }>({ name: '', categoryId: 0 });
+  const [ruleModalNewSupplier, setRuleModalNewSupplier] = useState<{ name: string; categoryId: string }>({ name: '', categoryId: '' });
   const [showRulesList, setShowRulesList] = useState(false);
-  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
-  const [editingRuleDraft, setEditingRuleDraft] = useState<{ pattern: string; categoryId?: number; supplierId?: number; active?: boolean } | null>(null);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [editingRuleDraft, setEditingRuleDraft] = useState<{ pattern: string; categoryId?: string; supplierId?: string; active?: boolean } | null>(null);
 
   useEffect(() => {
     // Load existing rules when preview opens
@@ -122,41 +122,49 @@ export function BankImportPreview({
     }));
   }, [rules, suppliers]);
 
-  const handleToggleSelect = (id: number) => {
+  const handleToggleSelect = (id: string) => {
     setTransactions(prev =>
-      prev.map(t => (t.id === id ? { ...t, selected: !t.selected } : t))
+  prev.map(t => (String(t.id) === String(id) ? { ...t, selected: !t.selected } : t))
     );
   };
 
-  const handleCategoryChange = (id: number, categoryId: number) => {
+  const handleCategoryChange = (id: string, categoryId: string) => {
     setTransactions(prev =>
-      prev.map(t => (t.id === id ? { ...t, categoryId, supplierId: 0 } : t))
+  prev.map(t => (String(t.id) === String(id) ? { ...t, categoryId, supplierId: '' } : t))
     );
   };
 
-  const handleSupplierChange = (id: number, supplierId: number) => {
+  const handleSupplierChange = (id: string, supplierId: string) => {
     // If supplier chosen, ensure category matches supplier's category (guards against stale UI state)
-    const sup = suppliers.find(s => s.id === supplierId);
+    const sup = suppliers.find(s => String(s.id) === String(supplierId));
     setTransactions(prev =>
-      prev.map(t => (t.id === id ? { ...t, supplierId, categoryId: sup ? sup.categoryId : t.categoryId } : t))
+      prev.map(t => (
+        String(t.id) === String(id)
+          ? {
+              ...t,
+              supplierId: supplierId ? String(supplierId) : '',
+              categoryId: sup ? String(sup.categoryId) : t.categoryId
+            }
+          : t
+      ))
     );
   };
 
   // Bulk helpers
   const applyBulkCategory = () => {
-    if (!bulkCategoryId) return;
-    setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, categoryId: bulkCategoryId, supplierId: 0 } : t));
+  if (!bulkCategoryId) return;
+  setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, categoryId: bulkCategoryId, supplierId: '' } : t));
   };
   const applyBulkSupplier = () => {
-    if (!bulkSupplierId) return;
-    const sup = suppliers.find(s => s.id === bulkSupplierId);
-    setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, supplierId: bulkSupplierId, categoryId: sup ? sup.categoryId : t.categoryId } : t));
+  if (!bulkSupplierId) return;
+  const sup = suppliers.find(s => s.id === bulkSupplierId);
+  setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, supplierId: bulkSupplierId, categoryId: sup ? sup.categoryId : t.categoryId } : t));
   };
   const clearBulkCategory = () => {
-    setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, categoryId: 0, supplierId: 0 } : t));
+  setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, categoryId: '', supplierId: '' } : t));
   };
   const clearBulkSupplier = () => {
-    setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, supplierId: 0 } : t));
+  setTransactions(prev => prev.map(t => (t.selected && !t.isDuplicate) ? { ...t, supplierId: '' } : t));
   };
   const bulkReapplyRules = () => {
     if (!rules || rules.length === 0) return;
@@ -168,33 +176,33 @@ export function BankImportPreview({
       let supplierId = t.supplierId;
       let changed = false;
       if (!categoryId) {
-        if (match.categoryId) { categoryId = match.categoryId; changed = true; }
+        if (match.categoryId) { categoryId = String(match.categoryId); changed = true; }
         else if (match.supplierId) {
-          const msup = suppliers.find(s => s.id === match.supplierId);
+          const msup = suppliers.find(s => String(s.id) === String(match.supplierId));
           if (msup) { categoryId = msup.categoryId; changed = true; }
         }
       }
-      if (!supplierId && match.supplierId) { supplierId = match.supplierId; changed = true; }
-      return changed ? { ...t, categoryId: categoryId || 0, supplierId: supplierId || 0, matchedRulePattern: match.pattern } : t;
+  if (!supplierId && match.supplierId) { supplierId = match.supplierId; changed = true; }
+      return changed ? { ...t, categoryId: categoryId || '', supplierId: supplierId || '', matchedRulePattern: match.pattern } : t;
     }));
   };
   
-  const reapplyRuleForRow = (id: number) => {
+  const reapplyRuleForRow = (id: string) => {
     setTransactions(prev => prev.map(t => {
-      if (t.id !== id) return t;
+  if (String(t.id) !== String(id)) return t;
       if (!t.matchedRulePattern) return t;
       const rule = rules.find(r => r.pattern === t.matchedRulePattern);
       if (!rule) return t;
       // Recalculate suggested values (incl inference)
       let categoryId = t.categoryId;
       let supplierId = t.supplierId;
-      if (rule.categoryId) categoryId = rule.categoryId;
+      if (rule.categoryId) categoryId = String(rule.categoryId);
       else if (rule.supplierId) {
-        const sup = suppliers.find(s => s.id === rule.supplierId);
+        const sup = suppliers.find(s => String(s.id) === String(rule.supplierId));
         if (sup) categoryId = sup.categoryId;
       }
-      if (rule.supplierId) supplierId = rule.supplierId;
-      return { ...t, categoryId: categoryId || 0, supplierId: supplierId || 0 };
+  if (rule.supplierId) supplierId = rule.supplierId;
+      return { ...t, categoryId: categoryId || '', supplierId: supplierId || '' };
     }));
   };
   
@@ -207,7 +215,7 @@ export function BankImportPreview({
       onCategoryCreated();
       // If we came from a specific row, assign the new category to that transaction
       if (categoryRowContext !== null && created?.id) {
-        setTransactions(prev => prev.map(t => t.id === categoryRowContext ? { ...t, categoryId: created.id, supplierId: 0 } : t));
+      setTransactions(prev => prev.map(t => String(t.id) === String(categoryRowContext) ? { ...t, categoryId: created.id, supplierId: '' } : t));
       }
       // If rule modal is open and we are in inline create there, set rule category
       if (showRuleModal && ruleModalCreatingCategory && created?.id) {
@@ -223,25 +231,32 @@ export function BankImportPreview({
     }
   };
   
-  const handleCreateSupplier = async (supplierOverride?: { name: string; categoryId: number }) => {
+  const handleCreateSupplier = async (supplierOverride?: { name: string; categoryId: string }) => {
     const payload = supplierOverride ?? newSupplier;
-    if (!payload.name.trim() || !payload.categoryId) return;
+    const category = String(payload.categoryId);
+    if (!payload.name.trim() || !category || category.length < 12) {
+      alert('Du måste välja en giltig kategori innan du kan skapa leverantör.');
+      return;
+    }
     try {
-      const res = await api.post('/suppliers', payload);
+      console.log('Skickar till backend:', { name: payload.name, category });
+      // Skicka 'category' istället för 'categoryId' till backend
+      const res = await api.post('/suppliers', { name: payload.name, category: category });
       const created = res.data;
       onSupplierCreated();
       if (supplierRowContext !== null && created?.id) {
-        setTransactions(prev => prev.map(t => t.id === supplierRowContext ? { ...t, supplierId: created.id, categoryId: created.categoryId } : t));
+        setTransactions(prev => prev.map(t => String(t.id) === String(supplierRowContext) ? { ...t, supplierId: String(created.id), categoryId: String(created.categoryId) } : t));
       }
       if (showRuleModal && ruleModalCreatingSupplier && created?.id) {
-        setNewRule(r => ({ ...r, supplierId: created.id, categoryId: r.categoryId || created.categoryId }));
+        setNewRule(r => ({ ...r, supplierId: String(created.id), categoryId: String(created.categoryId) }));
         setRuleModalCreatingSupplier(false);
-        setRuleModalNewSupplier({ name: '', categoryId: 0 });
+        setRuleModalNewSupplier({ name: '', categoryId: '' });
       }
       setSupplierRowContext(null);
       setShowSupplierModal(false);
     } catch (error) {
       console.error('Failed to create supplier:', error);
+      alert('Kunde inte skapa leverantör. Kontrollera att kategori är vald och försök igen.');
     }
   };
 
@@ -258,7 +273,7 @@ export function BankImportPreview({
   const handleCreateRule = async () => {
     if (!newRule.pattern.trim()) return;
     try {
-      const created = await importRulesAPI.create(newRule.pattern, newRule.categoryId || undefined, newRule.supplierId || undefined);
+  const created = await importRulesAPI.create(newRule.pattern, newRule.categoryId || undefined, newRule.supplierId || undefined);
       setRules(prev => [...prev, created]);
       setShowRuleModal(false);
       setNewRule({ pattern: '' });
@@ -275,7 +290,7 @@ export function BankImportPreview({
           return {
             ...t,
             categoryId: nextCategoryId,
-            supplierId: created.supplierId ?? t.supplierId,
+            supplierId: created.supplierId ? created.supplierId : t.supplierId,
             matchedRulePattern: created.pattern,
           };
         }
@@ -302,8 +317,8 @@ export function BankImportPreview({
   };
 
   const startEditRule = (rule: any) => {
-    setEditingRuleId(rule.id);
-    setEditingRuleDraft({ pattern: rule.pattern, categoryId: rule.categoryId, supplierId: rule.supplierId, active: rule.active });
+  setEditingRuleId(rule.id);
+  setEditingRuleDraft({ pattern: rule.pattern, categoryId: rule.categoryId ? String(rule.categoryId) : undefined, supplierId: rule.supplierId ? String(rule.supplierId) : undefined, active: rule.active });
   };
 
   const cancelEditRule = () => {
@@ -314,7 +329,7 @@ export function BankImportPreview({
   const saveEditRule = async () => {
     if (editingRuleId == null || !editingRuleDraft) return;
     try {
-      const updated = await importRulesAPI.update(editingRuleId, editingRuleDraft);
+  const updated = await importRulesAPI.update(editingRuleId, editingRuleDraft);
       setRules(prev => prev.map(r => r.id === editingRuleId ? updated : r));
       cancelEditRule();
     } catch (e) { console.error('Failed to update rule', e); }
@@ -345,11 +360,11 @@ export function BankImportPreview({
             <label className="text-xs text-gray-600 dark:text-gray-400">Bulk kategori</label>
             <select
               value={bulkCategoryId}
-              onChange={(e) => setBulkCategoryId(Number(e.target.value))}
+              onChange={(e) => setBulkCategoryId(e.target.value)}
               className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
             >
-              <option value={0}>Välj kategori</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value={''}>Välj kategori</option>
+              {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
             </select>
             <div className="flex gap-2 mt-1">
               <button
@@ -370,10 +385,10 @@ export function BankImportPreview({
             <label className="text-xs text-gray-600 dark:text-gray-400">Bulk leverantör</label>
             <select
               value={bulkSupplierId}
-              onChange={(e) => setBulkSupplierId(Number(e.target.value))}
+              onChange={(e) => setBulkSupplierId(e.target.value)}
               className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
             >
-              <option value={0}>Välj leverantör</option>
+                        <option value={''}>Välj leverantör</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             <div className="flex gap-2 mt-1">
@@ -414,17 +429,16 @@ export function BankImportPreview({
           <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
             <tr>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                <input
-                  type="checkbox"
-                  checked={transactions.filter(t => !t.isDuplicate).every(t => t.selected)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setTransactions(prev =>
-                      prev.map(t => (t.isDuplicate ? t : { ...t, selected: checked }))
-                    );
-                  }}
+                <select
+                  value={bulkSupplierId}
+                  onChange={(e) => setBulkSupplierId(e.target.value)}
                   className="rounded"
-                />
+                >
+                  <option value={''}>Välj leverantör</option>
+                  {suppliers.map(sup => (
+                    <option key={sup.id} value={sup.id}>{sup.name}</option>
+                  ))}
+                </select>
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Datum</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Beskrivning</th>
@@ -491,7 +505,7 @@ export function BankImportPreview({
                       type="checkbox"
                       checked={trans.selected}
                       disabled={trans.isDuplicate}
-                      onChange={() => handleToggleSelect(trans.id)}
+                      onChange={() => handleToggleSelect(String(trans.id))}
                       className="rounded"
                     />
                   </td>
@@ -505,7 +519,7 @@ export function BankImportPreview({
                     )}
                     {trans.matchedRulePattern && (
                       <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px]" title={`Regel: ${trans.matchedRulePattern} (klick för att återställa)`}>
-                        <button type="button" onClick={() => reapplyRuleForRow(trans.id)} className="underline decoration-dotted">
+                        <button type="button" onClick={() => reapplyRuleForRow(String(trans.id))} className="underline decoration-dotted">
                           Regel: {trans.matchedRulePattern}
                         </button>
                       </span>
@@ -520,13 +534,13 @@ export function BankImportPreview({
                     <div className="flex items-center gap-1">
                       <select
                         value={trans.categoryId}
-                        onChange={(e) => handleCategoryChange(trans.id, Number(e.target.value))}
+                        onChange={(e) => handleCategoryChange(String(trans.id), e.target.value)}
                         disabled={trans.isDuplicate}
                         className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700"
                       >
-                        <option value={0}>Välj kategori</option>
+                        <option value={''}>Välj kategori</option>
                         {categories.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          <option key={cat._id} value={cat._id}>{cat.name}</option>
                         ))}
                       </select>
                       {trans.matchedRulePattern && !trans.categoryId && (
@@ -538,7 +552,7 @@ export function BankImportPreview({
                         type="button"
                         disabled={trans.isDuplicate}
                         onClick={() => {
-                          setCategoryRowContext(trans.id);
+                          setCategoryRowContext(String(trans.id));
                           setShowCategoryModal(true);
                         }}
                         className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 disabled:opacity-40"
@@ -554,11 +568,11 @@ export function BankImportPreview({
                     <div className="flex items-center gap-1">
                       <select
                         value={trans.supplierId}
-                        onChange={(e) => handleSupplierChange(trans.id, Number(e.target.value))}
+                        onChange={(e) => handleSupplierChange(String(trans.id), e.target.value)}
                         disabled={trans.isDuplicate || !trans.categoryId}
                         className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700"
                       >
-                        <option value={0}>Välj leverantör</option>
+                        <option value={''}>Välj leverantör</option>
                         {filteredSuppliers.map(sup => (
                           <option key={sup.id} value={sup.id}>{sup.name}</option>
                         ))}
@@ -572,7 +586,7 @@ export function BankImportPreview({
                         type="button"
                         disabled={trans.isDuplicate || !trans.categoryId}
                         onClick={() => {
-                          setSupplierRowContext(trans.id);
+                          setSupplierRowContext(String(trans.id));
                           setNewSupplier({ name: '', categoryId: trans.categoryId });
                           setShowSupplierModal(true);
                         }}
@@ -670,19 +684,19 @@ export function BankImportPreview({
             />
             <select
               value={newSupplier.categoryId}
-              onChange={(e) => setNewSupplier({ ...newSupplier, categoryId: Number(e.target.value) })}
+              onChange={(e) => setNewSupplier({ ...newSupplier, categoryId: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
             >
-              <option value={0}>Välj kategori</option>
+              <option value={''}>Välj kategori</option>
               {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <option key={cat._id} value={cat._id}>{cat.name}</option>
               ))}
             </select>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowSupplierModal(false);
-                  setNewSupplier({ name: '', categoryId: 0 });
+                  setNewSupplier({ name: '', categoryId: '' });
                 }}
                 className="btn-secondary"
               >
@@ -690,7 +704,7 @@ export function BankImportPreview({
               </button>
               <button
                 onClick={() => handleCreateSupplier()}
-                disabled={!newSupplier.name.trim() || !newSupplier.categoryId}
+                disabled={!newSupplier.name.trim() || !newSupplier.categoryId || newSupplier.categoryId === ''}
                 className="btn-primary"
               >
                 Skapa
@@ -727,20 +741,19 @@ export function BankImportPreview({
                 </label>
                 {!ruleModalCreatingCategory ? (
                   <select
-                    value={newRule.categoryId || 0}
-                    onChange={(e) => setNewRule({ ...newRule, categoryId: Number(e.target.value) || undefined })}
+                    value={newRule.categoryId || ''}
+                    onChange={(e) => setNewRule({ ...newRule, categoryId: e.target.value || undefined })}
                     className="w-full px-2 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value={0}>Ingen</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <option value={''}>Ingen</option>
+                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                   </select>
                 ) : (
-                  <div className="space-y-1">
+                  <div>
                     <input
                       type="text"
                       value={ruleModalNewCategoryName}
                       onChange={(e) => setRuleModalNewCategoryName(e.target.value)}
-                      className="w-full px-2 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="Ny kategori"
                       autoFocus
                     />
@@ -762,20 +775,20 @@ export function BankImportPreview({
                   {!ruleModalCreatingSupplier && (
                     <button
                       type="button"
-                      onClick={() => { setRuleModalCreatingSupplier(true); setRuleModalNewSupplier({ name: '', categoryId: newRule.categoryId || 0 }); }}
+                      onClick={() => { setRuleModalCreatingSupplier(true); setRuleModalNewSupplier({ name: '', categoryId: newRule.categoryId || '' }); }}
                       className="text-[10px] px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
                     >+ ny</button>
                   )}
                 </label>
                 {!ruleModalCreatingSupplier ? (
                   <select
-                    value={newRule.supplierId || 0}
-                    onChange={(e) => setNewRule({ ...newRule, supplierId: Number(e.target.value) || undefined })}
+                    value={newRule.supplierId || ''}
+                    onChange={(e) => setNewRule({ ...newRule, supplierId: e.target.value || undefined })}
                     className="w-full px-2 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value={0}>Ingen</option>
+                    <option value={''}>Ingen</option>
                     {suppliers
-                      .filter(s => !newRule.categoryId || s.categoryId === newRule.categoryId)
+                      .filter(s => !newRule.categoryId || s.categoryId === String(newRule.categoryId))
                       .map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 ) : (
@@ -790,18 +803,22 @@ export function BankImportPreview({
                     />
                     <select
                       value={ruleModalNewSupplier.categoryId}
-                      onChange={(e) => setRuleModalNewSupplier(prev => ({ ...prev, categoryId: Number(e.target.value) }))}
+                      onChange={(e) => setRuleModalNewSupplier(prev => ({ ...prev, categoryId: e.target.value }))}
                       className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                     >
-                      <option value={0}>Välj kategori</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <option value={''}>Välj kategori</option>
+                      {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                     </select>
                     <div className="flex gap-1 justify-end">
-                      <button type="button" onClick={() => { setRuleModalCreatingSupplier(false); setRuleModalNewSupplier({ name: '', categoryId: 0 }); }} className="text-[10px] px-2 py-1 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">Avbryt</button>
+                      <button type="button" onClick={() => { setRuleModalCreatingSupplier(false); setRuleModalNewSupplier({ name: '', categoryId: '' }); }} className="text-[10px] px-2 py-1 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">Avbryt</button>
                       <button
                         type="button"
                         disabled={!ruleModalNewSupplier.name.trim() || !ruleModalNewSupplier.categoryId}
-                        onClick={() => handleCreateSupplier({ name: ruleModalNewSupplier.name, categoryId: ruleModalNewSupplier.categoryId })}
+                        onClick={() => {
+                          // Skicka alltid fältet "category" till backend
+                          if (!ruleModalNewSupplier.name.trim() || !ruleModalNewSupplier.categoryId) return;
+                          handleCreateSupplier({ name: ruleModalNewSupplier.name, categoryId: String(ruleModalNewSupplier.categoryId) });
+                        }}
                         className="text-[10px] px-2 py-1 rounded bg-green-600 text-white disabled:opacity-50"
                       >Spara</button>
                     </div>
@@ -857,7 +874,7 @@ export function BankImportPreview({
                           </div>
                         </div>
                         <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                          <div>Kategori: {rule.categoryId ? categories.find(c => c.id === rule.categoryId)?.name || rule.categoryId : '—'}</div>
+                          <div>Kategori: {rule.categoryId ? categories.find(c => c._id === String(rule.categoryId))?.name || rule.categoryId : '—'}</div>
                           <div>Leverantör: {rule.supplierId ? suppliers.find(s => s.id === rule.supplierId)?.name || rule.supplierId : '—'}</div>
                         </div>
                       </>
@@ -871,19 +888,19 @@ export function BankImportPreview({
                         />
                         <div className="grid grid-cols-2 gap-2">
                           <select
-                            value={editingRuleDraft?.categoryId || 0}
-                            onChange={(e) => setEditingRuleDraft(d => d ? { ...d, categoryId: Number(e.target.value) || undefined } : d)}
+                            value={editingRuleDraft?.categoryId || ''}
+                            onChange={(e) => setEditingRuleDraft(d => d ? { ...d, categoryId: e.target.value || undefined } : d)}
                             className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
                           >
-                            <option value={0}>Ingen kategori</option>
-                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            <option value={''}>Ingen kategori</option>
+                            {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                           </select>
                           <select
-                            value={editingRuleDraft?.supplierId || 0}
-                            onChange={(e) => setEditingRuleDraft(d => d ? { ...d, supplierId: Number(e.target.value) || undefined } : d)}
+                            value={editingRuleDraft?.supplierId || ''}
+                            onChange={(e) => setEditingRuleDraft(d => d ? { ...d, supplierId: e.target.value || undefined } : d)}
                             className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
                           >
-                            <option value={0}>Ingen leverantör</option>
+                            <option value={''}>Ingen leverantör</option>
                             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
                         </div>

@@ -11,6 +11,7 @@ interface Supplier {
   id: number;
   name: string;
   categoryId: number;
+  category?: string;
   organizationNumber?: string;
   address?: string;
   postalCode?: string;
@@ -114,7 +115,7 @@ export function CategoriesSuppliers() {
     e.preventDefault();
     const data = {
       ...supplierForm,
-      categoryId: supplierForm.categoryId || selectedCategory || 0
+      category: supplierForm.categoryId || selectedCategory || 0
     };
     
     console.log('Submitting supplier:', data);
@@ -187,8 +188,8 @@ export function CategoriesSuppliers() {
   };
 
   const filteredSuppliers = selectedCategory 
-    ? suppliers.filter(s => s.categoryId === selectedCategory)
-    : suppliers;
+  ? suppliers.filter(s => s.category === String(selectedCategory))
+  : suppliers;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

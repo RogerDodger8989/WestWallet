@@ -48,10 +48,10 @@ api.interceptors.response.use(
 export interface User { id: number; username: string }
 
 export const authAPI = {
-  register: async (username: string, password: string) => {
+  register: async (email: string, password: string) => {
     try {
       console.log('Attempting register to:', `${API_BASE_URL}/auth/register`);
-      const { data } = await api.post('/auth/register', { username, password });
+      const { data } = await api.post('/auth/register', { email, password });
       console.log('Register success:', data);
       return data;
     } catch (error: any) {
@@ -60,10 +60,10 @@ export const authAPI = {
       throw error;
     }
   },
-  login: async (username: string, password: string) => {
+  login: async (email: string, password: string) => {
     try {
       console.log('Attempting login to:', `${API_BASE_URL}/auth/login`);
-      const { data } = await api.post('/auth/login', { username, password });
+      const { data } = await api.post('/auth/login', { email, password });
       console.log('Login success:', data);
       if (data.access_token) {
         localStorage.setItem('accessToken', data.access_token);
@@ -149,7 +149,7 @@ export const suppliersAPI = {
     return data;
   },
   create: async (name: string, categoryId: number) => {
-    const { data } = await api.post('/suppliers', { name, categoryId });
+    const { data } = await api.post('/suppliers', { name, category: categoryId });
     return data;
   },
   update: async (id: number, partial: { name?: string; categoryId?: number }) => {
@@ -168,15 +168,15 @@ export const importRulesAPI = {
     const { data } = await api.get('/expenses/import/rules');
     return data;
   },
-  create: async (pattern: string, categoryId?: number, supplierId?: number) => {
+  create: async (pattern: string, categoryId?: string, supplierId?: string) => {
     const { data } = await api.post('/expenses/import/rules', { pattern, categoryId, supplierId });
     return data;
   },
-  update: async (id: number, updates: any) => {
+  update: async (id: string, updates: any) => {
     const { data } = await api.put(`/expenses/import/rules/${id}`, updates);
     return data;
   },
-  remove: async (id: number) => {
+  remove: async (id: string) => {
     const { data } = await api.delete(`/expenses/import/rules/${id}`);
     return data;
   }

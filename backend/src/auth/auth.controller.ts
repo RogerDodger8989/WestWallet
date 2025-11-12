@@ -7,7 +7,7 @@ import {
   Get,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RefreshTokenGuard } from './refresh-token.guard';
@@ -21,6 +21,16 @@ export class AuthController {
   @Post('register')
   @ApiOperation({
     summary: 'Registrera ny användare (skickar verifieringsmail)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'user@example.com' },
+        password: { type: 'string', example: 'dittlösenord' },
+      },
+      required: ['email', 'password'],
+    },
   })
   async register(@Body() body: { email: string; password: string }) {
     return this.authService.register(body.email, body.password);
@@ -42,6 +52,16 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Logga in och få access/refresh tokens' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'admin@example.com' },
+        password: { type: 'string', example: 'dittlösenord' },
+      },
+      required: ['email', 'password'],
+    },
+  })
   async login(@Body() body: { email: string; password: string }) {
     const user = await this.authService.validateUser(body.email, body.password);
     return this.authService.login(user);
