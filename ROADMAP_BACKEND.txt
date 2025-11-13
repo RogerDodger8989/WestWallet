@@ -1,0 +1,7 @@
+# Roadmap Backend
+
+Se detaljerad roadmap i denna fil. Huvudfilen för roadmapen är `backend/ROADMAP_BACKEND.txt`.
+
+För att roadmapen ska synas på GitHub, se till att denna fil är committad och pushad.
+
+För frontend-roadmap, se `web/README.md`.
