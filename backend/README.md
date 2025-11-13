@@ -1,3 +1,32 @@
+## Undo-funktion & Papperskorg
+## Bild-/filhantering
+## Trial/prenumeration
+## Köhantering (BullMQ/Nest Bull)
+
+Tunga processer hanteras via BullMQ/Nest Bull:
+- Importera bankfiler
+- Generera PDF
+- Skicka mail/notiser
+- Cronjobs
+- Bildkomprimering
+Kömodul (`QueueModule`) är installerad och konfigurerad. Lägg till workers för respektive process.
+
+Efter 30 dagar får användaren read-only-läge om isPaid är false:
+- Kan ej skapa/ändra/radera poster, ladda upp filer, exportera, synca kalender
+- Banner visas när trial är slut
+Adminpanel visar trial_start, trial_days_left, is_paid, payment_method
+
+Bilder och filer lagras i `/uploads/{ID}/` på backend.
+API:
+- POST `/uploads/:id` (multipart/form-data, fält: file) – ladda upp fil
+- DELETE `/uploads/:id/:filename` – radera fil
+Mapp skapas automatiskt per ID. Komprimering kan läggas till.
+
+Användare kan mjukt raderas (isDeleted, deletedAt) och återställas (undo) via API:
+- Soft delete: flyttar användare till papperskorg
+- Restore: återställer användare från papperskorg
+- Trash: lista borttagna användare
+Undo-tiden kan styras via preferences. Hard delete via cron-jobb kan läggas till.
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
@@ -30,6 +59,40 @@
 ```bash
 $ npm install
 ```
+
+## Globalt ID-system
+
+WestWallet backend använder ett globalt ID-system för alla poster (t.ex. A000001, A000002 ...). Detta hanteras av en MongoDB counter och en ID-generator:
+
+- `src/utils/id-generator.ts`: Funktion `getNextGlobalId()` genererar nästa ID.
+- `src/models/counter.schema.ts`: Counter-schema för sekvensnummer.
+
+Alla nya poster kan tilldelas ett unikt globalt ID via denna funktion.
+
+## Användarhantering & Autentisering
+
+WestWallet backend har en avancerad användarhantering:
+
+  - preferences (notiser, UI, papperskorg, etc.)
+  - trial (trial_start, trial_days_left, is_paid, payment_method, payment_history)
+  - paymentHistory (alla betalningar och status)
+  - roller (admin/user/moderator) och roles: string[]
+  - Exempel på preferences:
+    - notifications: { ... }
+    - ui: { theme: 'dark' }
+    - trash: { undoTimeout: 10 }
+
+## Rollhantering & Behörigheter
+
+Endpoints skyddas med @Roles('admin'), @Roles('user'), etc. via RolesGuard och Roles-decorator.
+Behörighetskontroll sker automatiskt för alla endpoints med rollkrav.
+- Read-only-läge efter trial-period (kan ej skapa/ändra/radera poster, ladda upp filer, exportera, synca kalender)
+- Banner visas när trial är slut
+- Adminpanel: se användare, trial-status, betalhistorik
+- E-postverifiering vid registrering
+- Token-refresh för längre sessioner
+- Kryptering av känslig data (AES med crypto-js)
+- Lösenord hashas med bcrypt
 
 ## Compile and run the project
 

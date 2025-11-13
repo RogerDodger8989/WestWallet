@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { UserDocument } from './schemas/user.schema';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -19,6 +20,64 @@ import { Roles } from '../auth/roles.decorator';
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
+        // Soft delete user (move to trash)
+        @UseGuards(JwtAuthGuard, RolesGuard)
+        @Roles('admin')
+        @ApiBearerAuth()
+        @Delete(':id')
+        @ApiOperation({ summary: 'Soft delete user (move to trash)' })
+        async softDeleteUser(@Param('id') id: string) {
+          const user = await this.usersService.softDeleteUser(id);
+          if (!user) throw new NotFoundException('User not found or already deleted');
+          return { success: true };
+        }
+
+        // Restore user from trash
+        @UseGuards(JwtAuthGuard, RolesGuard)
+        @Roles('admin')
+        @ApiBearerAuth()
+        @Patch('restore/:id')
+        @ApiOperation({ summary: 'Restore user from trash' })
+        async restoreUser(@Param('id') id: string) {
+          const user = await this.usersService.restoreUser(id);
+          if (!user) throw new NotFoundException('User not found or not deleted');
+          return { success: true };
+        }
+
+        // List deleted users (trash)
+        @UseGuards(JwtAuthGuard, RolesGuard)
+        @Roles('admin')
+        @ApiBearerAuth()
+        @Get('trash')
+        @ApiOperation({ summary: 'List deleted users (trash)' })
+        async listDeletedUsers() {
+          return this.usersService.listDeletedUsers();
+        }
+    // Hämta användarens inställningar
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('user', 'admin')
+    @ApiBearerAuth()
+    @Get('me/preferences')
+    @ApiOperation({ summary: 'Hämta användarens inställningar' })
+    async getPreferences(@Req() req: any) {
+      const user = await this.usersService.findById(req.user.userId);
+      if (!user) throw new NotFoundException('Användaren hittades inte');
+      return user.preferences || {};
+    }
+
+    // Uppdatera användarens inställningar
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('user', 'admin')
+    @ApiBearerAuth()
+    @Patch('me/preferences')
+    @ApiOperation({ summary: 'Uppdatera användarens inställningar' })
+    async updatePreferences(@Req() req: any, @Body() prefs: any) {
+      const user = await this.usersService.findById(req.user.userId);
+      if (!user) throw new NotFoundException('Användaren hittades inte');
+      user.preferences = { ...user.preferences, ...prefs };
+      await user.save();
+      return user.preferences;
+    }
   constructor(private readonly usersService: UsersService) {}
 
   // Hämta inloggad användare

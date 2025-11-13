@@ -1,0 +1,110 @@
+17. Automatiska taggar / smart kategorisering (AI optional)
+   - Funktion: POST /ai/categorize
+   - Vid utgift: undersök leverantör, text, belopp, föreslå kategori
+
+18. Webhooks (framtidssäkert)
+   - /webhooks/subscribe, /webhooks/events
+   - Händelser: post skapad, avtal slutar snart, ny bild uppladdad
+   - Kan kopplas till Discord, Slack, Home Assistant, externa appar
+
+19. Cache-lager (Redis eller Memory cache)
+   - Cachea dashboard-data, statistik, kategorier, leverantörer, användarinställningar, bildmetadata
+
+20. Multi-tenant / Multi-user-stöd
+   - organizationId för hushåll, familjer, föreningar, företag
+   - Flera användare per organisation
+
+21. API Rate-Limiting per användare
+   - 200 requests/min per användare
+   - 20 writes/min
+   - Stoppar abuse
+WestWallet Backend Roadmap
+==========================
+
+1. Globalt ID-system (KLART)
+   - Gemensam sekvens för alla poster (A000001, A000002 ...)
+   - Robust ID-generator med MongoDB counter
+   - Implementerat i `src/utils/id-generator.ts` och `src/models/counter.schema.ts`.
+   - Funktion: `getNextGlobalId()` genererar nästa ID med prefix och sekvens.
+
+2. Användarhantering & autentisering
+    - User-modell med:
+       - preferences (notiser, UI, papperskorg, etc.)
+       - trial (trial_start, trial_days_left, is_paid, payment_method, payment_history)
+       - roller (admin/user/moderator)
+   - JWT-login, refresh-token, e-postverifiering (KLART)
+    - Read-only-läge efter trial-period (kan ej skapa/ändra/radera poster, ladda upp filer, exportera, synca kalender)
+    - Banner vid slut på trial
+    - Adminpanel: se användare, trial-status, betalhistorik
+    - E-postverifiering vid registrering
+    - Token-refresh för längre sessioner
+    - Kryptering av känslig data (AES med crypto-js)
+    - Lösenord hashas med bcrypt
+
+3. Rollhantering & behörigheter
+   - Endpoints skyddade med @Roles('admin') (KLART)
+   - Rate limiting för mail/reset-password (KLART)
+
+4. Undo-funktion & papperskorg
+   - Mjukt radera (isDeleted, deletedAt) (KLART för användare)
+   - Undo-knapp, restore-funktion
+   - Papperskorg med lista på borttagna användare
+
+5. Bild-/filhantering
+   - /uploads/{ID}/... struktur (KLART)
+   - API för uppladdning och radering (KLART)
+   - Komprimering kan läggas till senare
+
+6. Trial/prenumeration
+   - Read-only-läge efter 30 dagar (KLART)
+   - Banner, adminfält: trial_start, trial_days_left, is_paid, payment_method
+
+7. Import/export
+   - ZIP-format, remapping av ID vid import
+   - Export av bilder/filer, rapporter
+
+8. Notifieringar
+   - Cron-jobb för dagliga påminnelser
+   - Inställningar per användare
+   - Massutskick via admin
+
+9. Logging & auditlog
+   - Auditlog-schema
+   - Logging av alla viktiga händelser
+
+10. Systemhälsa & adminpanel
+    - Mailstatus, cronstatus, webhooks, uptime, disk, version
+
+11. Modul-specifika endpoints
+    - Ekonomihantering: transaktioner, kategorier, leverantörer
+    - Avtal & abonnemang: betalningsfrekvens, status, statistik
+    - Bilkostnader: bil, händelser, statistik
+    - Garantier, försäkringar, hushållsunderhåll: full CRUD, notifieringar
+
+12. Inställningar
+    - users.preferences: notiser, UI, papperskorg, etc.
+    - Adminpanel: systeminställningar
+
+13. Export/rapportering
+    - PDF/Excel/CSV, automatiska rapporter
+    - Statistik, grafer, trendlinjer
+
+14. Säkerhet & drift
+    - HTTPS, .env, backup, cronjob
+
+15. Bonus/AI
+   - Kostnadsprognos, anomalidetektering, automatisk kategorisering
+
+16. Köhantering (BullMQ/Nest Bull)
+   - Tunga processer (import, PDF, mail, notiser, cronjobs, bildkomprimering) hanteras via BullMQ/Nest Bull
+   - Separata workers, stabilt och skalbart
+
+Prioritering:
+1. ID-system, användarhantering, rollhantering
+2. Undo/papperskorg, bildhantering, trial
+3. Import/export, notifieringar, logging
+4. Modul-endpoints, inställningar, rapportering
+5. Säkerhet, drift, AI/bonus
+
+---
+Uppdatera roadmapen vid behov!

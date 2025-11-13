@@ -9,6 +9,8 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { QueueModule } from './queue/queue.module';
 
 dotenv.config();
 
@@ -25,6 +27,8 @@ dotenv.config();
   SuppliersModule,
   BudgetsModule,
   WalletsModule,
+  UploadsModule,
+  QueueModule,
   ],
   controllers: [],
   providers: [],

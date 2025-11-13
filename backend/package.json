@@ -7,6 +7,7 @@
     "test": "test"
   },
   "dependencies": {
+    "@nestjs/bull": "^11.0.4",
     "@nestjs/jwt": "^11.0.1",
     "@nestjs/mongoose": "^11.0.3",
     "@nestjs/passport": "^11.0.5",
@@ -52,6 +53,7 @@
     "buffer": "^5.7.1",
     "buffer-equal-constant-time": "^1.0.1",
     "buffer-from": "^1.1.2",
+    "bullmq": "^5.63.1",
     "busboy": "^1.6.0",
     "bytes": "^3.1.2",
     "call-bind-apply-helpers": "^1.0.2",
@@ -197,6 +199,7 @@
     "imurmurhash": "^0.1.4",
     "inflight": "^1.0.6",
     "inherits": "^2.0.4",
+    "ioredis": "^5.8.2",
     "ipaddr.js": "^1.9.1",
     "is-arrayish": "^0.2.1",
     "is-extglob": "^2.1.1",

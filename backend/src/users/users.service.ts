@@ -13,20 +13,20 @@ export class UsersService {
   // Skapa användare
   async createUser(
     email: string,
-    hashedPassword: string,
+    passwordHash: string,
   ): Promise<UserDocument> {
     const createdUser = new this.userModel({
       email,
-      password: hashedPassword,
-      isVerified: false,
+      passwordHash,
       role: 'user',
+      preferences: {},
     });
     return createdUser.save();
   }
 
   // Hitta användare via e-post
   async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ email }).exec();
+    return this.userModel.findOne({ email, isDeleted: false }).exec();
   }
 
   // Hitta användare via resetPasswordToken
@@ -38,7 +38,32 @@ export class UsersService {
 
   // Hitta användare via ID
   async findById(id: string): Promise<UserDocument | null> {
-    return this.userModel.findById(id).exec();
+    return this.userModel.findOne({ _id: id, isDeleted: false }).exec();
+  }
+
+  // Soft delete user (move to trash)
+  async softDeleteUser(id: string): Promise<UserDocument | null> {
+    const user = await this.userModel.findById(id);
+    if (!user || user.isDeleted) return null;
+    user.isDeleted = true;
+    user.deletedAt = new Date();
+    await user.save();
+    return user;
+  }
+
+  // Restore user from trash
+  async restoreUser(id: string): Promise<UserDocument | null> {
+    const user = await this.userModel.findById(id);
+    if (!user || !user.isDeleted) return null;
+    user.isDeleted = false;
+    user.deletedAt = null;
+    await user.save();
+    return user;
+  }
+
+  // List deleted users (in trash)
+  async listDeletedUsers(): Promise<UserDocument[]> {
+    return this.userModel.find({ isDeleted: true }).exec();
   }
 
   // Lista alla användare (för admin)
@@ -49,11 +74,11 @@ export class UsersService {
   // Uppdatera lösenord
   async updatePassword(
     userId: string,
-    hashedPassword: string,
+    passwordHash: string,
   ): Promise<UserDocument> {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('Användaren hittades inte');
-    user.password = hashedPassword;
+    user.passwordHash = passwordHash;
     return user.save();
   }
 
