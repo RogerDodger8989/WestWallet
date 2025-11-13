@@ -18,11 +18,49 @@ Dashboard-data, statistik, kategorier, leverantörer, användarinställningar oc
 
 Stöd för organizationId: hushåll, familjer, föreningar, företag med flera användare per organisation.
 
-## API Rate-Limiting per användare
 
-200 requests/min per användare, 20 writes/min. Stoppar abuse och skyddar API.
 
-Tunga processer hanteras via BullMQ/Nest Bull:
+### Audit trail & loggning
+
+Alla ändringar (skapa, uppdatera, radera) i utgifter loggas nu automatiskt i en auditlog.
+- Modell: `src/models/auditlog.schema.ts`
+- Service: `src/common/auditlog.service.ts`
+- Loggning sker vid create, update, delete i ExpensesService.
+- Loggen innehåller: tid, användare, typ av ändring, modell, dokument-ID, ändringar, IP.
+Exempel på loggpost:
+```json
+{
+  "timestamp": "2025-11-13T12:34:56Z",
+  "userId": "abc123",
+  "action": "update",
+  "model": "Expense",
+  "documentId": "xyz789",
+  "changes": { "before": {...}, "after": {...} },
+  "ip": "127.0.0.1"
+}
+```
+
+### Mail-teman & MJML-mallar
+
+Backend har nu stöd för avancerade e-postmallar med MJML:
+- Mallar: välkomstmail, faktura, påminnelse, rapport
+- Fil: `src/email/mail-templates.ts`
+- Service: `src/email/mjml.service.ts`
+- Modul: `src/email/mjml.module.ts`
+Exempel på mall:
+```mjml
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="22px" color="#333">Välkommen, Dennis!</mj-text>
+        <mj-text>Vi är glada att du valt WestWallet. Kom igång direkt!</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+```
+Alla mail kan nu genereras med responsiv design och snygga teman.
 - Importera bankfiler
 - Generera PDF
 - Skicka mail/notiser
@@ -78,6 +116,18 @@ Undo-tiden kan styras via preferences. Hard delete via cron-jobb kan läggas til
 ```bash
 $ npm install
 ```
+
+
+### Avancerad felhantering
+
+Alla fel i backend returnerar nu ett `errorCode`-fält, t.ex.:
+- `USER_NOT_FOUND`
+- `SUPPLIER_NOT_FOUND`
+- `CATEGORY_NOT_FOUND`
+- `EXPENSE_NOT_FOUND`
+- `ID_SEQUENCE_FAILED`
+- `ID_FORMAT_INVALID`
+Detta gör det enkelt för frontend att visa proffsiga felmeddelanden och hantera olika feltyper.
 
 ### Globalt ID-system
 

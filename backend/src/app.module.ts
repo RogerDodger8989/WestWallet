@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { EmailModule } from './email/email.module';
+import { MJMLModule } from './email/mjml.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
@@ -14,6 +15,7 @@ import { QueueModule } from './queue/queue.module';
 import { AiModule } from './ai/ai.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { CacheModule } from './cache/cache.module';
+import { AuditLogModule } from './common/auditlog.module';
 import { APP_GUARD } from '@nestjs/core';
 import { RateLimitGuard } from './auth/rate-limit.guard';
 
@@ -27,6 +29,7 @@ dotenv.config();
   AuthModule,
   UsersModule,
   EmailModule,
+  MJMLModule,
   CategoriesModule,
   ExpensesModule,
   SuppliersModule,
@@ -37,6 +40,7 @@ dotenv.config();
   AiModule,
   WebhooksModule,
   CacheModule,
+  AuditLogModule,
   ],
   controllers: [],
   providers: [

@@ -1,16 +1,38 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Expense, ExpenseDocument } from './expense.schema';
 
 @Injectable()
 export class ExpensesService {
+    // Statistik: summera utgifter per kategori och månad
+    async getStatsByCategoryAndMonth(year: number) {
+      return this.expenseModel.aggregate([
+        { $match: { year } },
+        { $group: {
+            _id: { category: '$category', month: '$month' },
+            total: { $sum: '$amount' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id.category': 1, '_id.month': 1 } }
+      ]);
+    }
   constructor(
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
+    @Inject('AuditLogService') private readonly auditLogService: any,
   ) {}
 
   async create(data: Partial<Expense>): Promise<ExpenseDocument> {
-    return new this.expenseModel(data).save();
+    const doc = await new this.expenseModel(data).save();
+    await this.auditLogService?.log({
+      userId: data.userId,
+      action: 'create',
+      model: 'Expense',
+      documentId: doc._id,
+      changes: data,
+    });
+    return doc;
   }
 
   async findAll(): Promise<ExpenseDocument[]> {
@@ -27,12 +49,31 @@ export class ExpensesService {
 
   async update(id: string, data: Partial<Expense>): Promise<ExpenseDocument> {
     const exp = await this.expenseModel.findById(id);
-    if (!exp) throw new NotFoundException('Utgift hittades inte');
+    if (!exp) {
+      const error: any = new NotFoundException('Utgift hittades inte');
+      error.errorCode = 'EXPENSE_NOT_FOUND';
+      throw error;
+    }
+    const before = { ...exp.toObject() };
     Object.assign(exp, data);
-    return exp.save();
+    const updated = await exp.save();
+    await this.auditLogService?.log({
+      userId: data.userId,
+      action: 'update',
+      model: 'Expense',
+      documentId: id,
+      changes: { before, after: updated.toObject() },
+    });
+    return updated;
   }
 
   async delete(id: string): Promise<void> {
-    await this.expenseModel.findByIdAndDelete(id);
+    const doc = await this.expenseModel.findByIdAndDelete(id);
+    await this.auditLogService?.log({
+      action: 'delete',
+      model: 'Expense',
+      documentId: id,
+      changes: doc?.toObject(),
+    });
   }
 }

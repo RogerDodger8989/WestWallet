@@ -71,9 +71,10 @@ WestWallet Backend Roadmap
    - Inställningar per användare
    - Massutskick via admin
 
-9. Logging & auditlog
-   - Auditlog-schema
-   - Logging av alla viktiga händelser
+9. Logging & audit trail (KLART)
+   - Auditlog-schema och service
+   - Alla ändringar i utgifter loggas automatiskt
+   - Endpoint: GET /expenses/auditlog visar senaste loggar
 
 10. Systemhälsa & adminpanel
     - Mailstatus, cronstatus, webhooks, uptime, disk, version
@@ -109,5 +110,17 @@ Prioritering:
 4. Modul-endpoints, inställningar, rapportering
 5. Säkerhet, drift, AI/bonus
 
----
 Uppdatera roadmapen vid behov!
+23. Avancerad felhantering (KLART)
+   errorCode: "SUPPLIER_NOT_FOUND", "USER_NOT_FOUND", "CATEGORY_NOT_FOUND", "EXPENSE_NOT_FOUND", "ID_SEQUENCE_FAILED", "ID_FORMAT_INVALID"
+   Alla services och controllers returnerar errorCode vid fel
+
+27. Avancerade mail-teman (MJML) (KLART)
+   - Backend kan generera fakturamail, påminnelsemail, välkomstmail, rapportmail
+   - Mallar i src/email/mail-templates.ts
+   - MJMLService och MJMLModule för rendering
+   Kan användas i frontend för proffsig UX
+
+24. Statistik & rapporter via Aggregation (KLART)
+   GET /expenses/stats/:year summerar utgifter per kategori och månad
+   Minska antalet queries med aggregation pipelines

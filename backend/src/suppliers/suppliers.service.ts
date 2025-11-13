@@ -23,7 +23,11 @@ export class SuppliersService {
 
   async update(id: string, name: string, category: string): Promise<SupplierDocument> {
     const sup = await this.supplierModel.findById(id);
-    if (!sup) throw new NotFoundException('Leverantör hittades inte');
+    if (!sup) {
+      const error: any = new NotFoundException('Leverantör hittades inte');
+      error.errorCode = 'SUPPLIER_NOT_FOUND';
+      throw error;
+    }
     sup.name = name;
     sup.category = category;
     return sup.save();

@@ -77,7 +77,11 @@ export class UsersService {
     passwordHash: string,
   ): Promise<UserDocument> {
     const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('Användaren hittades inte');
+    if (!user) {
+      const error: any = new NotFoundException('Användaren hittades inte');
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
+    }
     user.passwordHash = passwordHash;
     return user.save();
   }
@@ -155,7 +159,11 @@ export class UsersService {
   // 🧑‍💼 Ändra roll (admin)
   async updateUserRole(userId: string, role: string): Promise<UserDocument> {
     const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('Användaren hittades inte');
+    if (!user) {
+      const error: any = new NotFoundException('Användaren hittades inte');
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
+    }
     user.role = role;
     return user.save();
   }
@@ -164,7 +172,9 @@ export class UsersService {
   async deleteUser(userId: string): Promise<void> {
     const deleted = await this.userModel.findByIdAndDelete(userId).exec();
     if (!deleted) {
-      throw new NotFoundException('Användaren hittades inte');
+      const error: any = new NotFoundException('Användaren hittades inte');
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
     }
   }
 
@@ -172,7 +182,9 @@ export class UsersService {
   async verifyUserManually(userId: string): Promise<UserDocument> {
     const user = await this.userModel.findById(userId);
     if (!user) {
-      throw new NotFoundException('Användaren hittades inte');
+      const error: any = new NotFoundException('Användaren hittades inte');
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
     }
 
     user.isVerified = true;

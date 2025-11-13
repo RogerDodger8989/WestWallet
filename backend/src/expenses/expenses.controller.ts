@@ -3,6 +3,17 @@ import { ExpensesService } from './expenses.service';
 
 @Controller('expenses')
 export class ExpensesController {
+      // Hämta auditlogg för utgifter
+      @Get('auditlog')
+      async getAuditLog() {
+        const AuditLog = (await import('../models/auditlog.schema')).default;
+        return AuditLog.find({ model: 'Expense' }).sort({ timestamp: -1 }).limit(100).exec();
+      }
+    // Statistik: summera utgifter per kategori och månad
+    @Get('stats/:year')
+    async getStats(@Param('year') year: number) {
+      return this.expensesService.getStatsByCategoryAndMonth(year);
+    }
   constructor(private readonly expensesService: ExpensesService) {}
 
   @Post()

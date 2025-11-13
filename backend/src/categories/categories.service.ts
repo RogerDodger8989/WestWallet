@@ -23,7 +23,11 @@ export class CategoriesService {
 
   async update(id: string, name: string): Promise<CategoryDocument> {
     const cat = await this.categoryModel.findById(id);
-    if (!cat) throw new NotFoundException('Kategori hittades inte');
+    if (!cat) {
+      const error: any = new NotFoundException('Kategori hittades inte');
+      error.errorCode = 'CATEGORY_NOT_FOUND';
+      throw error;
+    }
     cat.name = name;
     return cat.save();
   }
