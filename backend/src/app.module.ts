@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AdminLogViewerController } from './admin-log-viewer.controller';
+import { AuditLogService } from './common/auditlog.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import * as dotenv from 'dotenv';
 import { AuthModule } from './auth/auth.module';
@@ -9,6 +11,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { BudgetsModule } from './budgets/budgets.module';
+import { DevicesModule } from './devices/devices.module';
+import { EventsModule } from './events/events.module';
 import { StatsModule } from './stats/stats.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -36,6 +40,8 @@ dotenv.config();
       ExpensesModule,
       SuppliersModule,
       BudgetsModule,
+      DevicesModule,
+      EventsModule,
       StatsModule,
       WalletsModule,
       UploadsModule,
@@ -46,8 +52,9 @@ dotenv.config();
       AuditLogModule,
       WsModule,
   ],
-  controllers: [],
+  controllers: [AdminLogViewerController],
   providers: [
+    AuditLogService,
     {
       provide: APP_GUARD,
       useClass: RateLimitGuard,

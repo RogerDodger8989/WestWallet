@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Expense, ExpenseDocument } from '../expenses/expense.schema';
 import { ScoreService } from './score.service';
 import { WhatIfService, WhatIfScenario } from './whatif.service';
+import { StatsCacheService } from './stats-cache.service';
 
 @Controller('stats')
 export class StatsController {
@@ -11,6 +12,7 @@ export class StatsController {
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
     private readonly scoreService: ScoreService,
     private readonly whatIfService: WhatIfService,
+    private readonly statsCacheService: StatsCacheService,
     @Inject('WsGateway') private readonly wsGateway: any,
   ) {}
 
@@ -43,5 +45,16 @@ export class StatsController {
     const result = this.whatIfService.simulate(expenses, income, debts, scenario);
     this.wsGateway?.sendEvent('whatIfSimulated', { scenario, result });
     return result;
+  }
+
+  @Get('cached')
+  async getCachedStats(
+    @Query('year') year: number,
+    @Query('income') income: number,
+  ) {
+    const expenses = await this.expenseModel.find({ year }).exec();
+    const stats = await this.statsCacheService.getOrCalculateStats(year, expenses, income);
+    this.wsGateway?.sendEvent('statsCached', stats);
+    return stats;
   }
 }
