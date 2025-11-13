@@ -110,7 +110,54 @@ Prioritering:
 4. Modul-endpoints, inställningar, rapportering
 5. Säkerhet, drift, AI/bonus
 
+
+API & Infrastruktur
+✔ 8. WebSockets för live-uppdateringar
+   - När en post skapas: andra flikar uppdateras automatiskt
+   - Dashboards live-refresh
+   - “ny bild uppladdad”-notification
+   - NestJS Gateway gör det enkelt
+
+Export-jobb som körs i bakgrunden
+   - Ingen mer “vänta på export”-problematik
+   - Backend kan köa export-jobb
+   - Maila PDF/XLS när klart
+
+Event Sourcing (avancerat men episk funktion)
+   - Istället för att spara rådata alltid → spara events:
+     - PostCreated, PostUpdated, FileUploaded, GuaranteeExpired, PaymentPosted
+   - Bygg timeliner, audit, analyssystem
+
+Device management
+   - Backend håller koll på:
+     - senaste inloggad enhet, IP-adresser, sessions, device-namn
+   - Användaren kan logga ut andra sessioner
+
+Datahantering
+   - Soft delete + restore (papperskorg)
+   - Alla poster först hamnar i “trashbin”
+   - Admin och användare kan återställa
+
+Skapa mellanberäkningar (cacheade stats)
+   - Istället för att frontend ska processa allt:
+   - Backend samlar: total expenses, total income, total by vendor, total by category, difference + prognos
+   - Gör dashboards EXTREMT snabba
+
+Billing, licenser & betalning
+✔ 24. Full subscription-hantering
+   - Backend hanterar: trial, grace-period, avstängning, återaktivering, webhooks från Stripe, invoice-historik
+
+Admin-log viewer
+   - Se loggar direkt i adminpanelen via API
+
+Admin “impersonate user”
+   - Admin kan se användarens vy, hjälpa dem med felet utan att få deras lösenord
+
 Uppdatera roadmapen vid behov!
+
+28. Offline sync-stöd (KLART)
+   - Endpoint: GET /expenses/sync?since=timestamp
+   - Returnerar endast ändrade poster sedan angiven tidpunkt
 23. Avancerad felhantering (KLART)
    errorCode: "SUPPLIER_NOT_FOUND", "USER_NOT_FOUND", "CATEGORY_NOT_FOUND", "EXPENSE_NOT_FOUND", "ID_SEQUENCE_FAILED", "ID_FORMAT_INVALID"
    Alla services och controllers returnerar errorCode vid fel

@@ -5,9 +5,13 @@ import { Expense, ExpenseDocument } from './expense.schema';
 
 @Injectable()
 export class ExpensesService {
+      // Offline sync: hämta utgifter ändrade sedan viss tidpunkt
+      async findChangedSince(since: Date): Promise<ExpenseDocument[]> {
+        return this.expenseModel.find({ updatedAt: { $gte: since } }).exec();
+      }
     // Statistik: summera utgifter per kategori och månad
     async getStatsByCategoryAndMonth(year: number) {
-      return this.expenseModel.aggregate([
+      const stats = await this.expenseModel.aggregate([
         { $match: { year } },
         { $group: {
             _id: { category: '$category', month: '$month' },
@@ -17,21 +21,26 @@ export class ExpensesService {
         },
         { $sort: { '_id.category': 1, '_id.month': 1 } }
       ]);
+      // WebSocket: skicka event till alla klienter
+      this.wsGateway?.sendEvent('dashboardStats', { year, stats });
+      return stats;
     }
   constructor(
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
     @Inject('AuditLogService') private readonly auditLogService: any,
+    @Inject('WsGateway') private readonly wsGateway: any,
   ) {}
 
   async create(data: Partial<Expense>): Promise<ExpenseDocument> {
     const doc = await new this.expenseModel(data).save();
     await this.auditLogService?.log({
-      userId: data.userId,
       action: 'create',
       model: 'Expense',
       documentId: doc._id,
       changes: data,
     });
+    // WebSocket: skicka event till alla klienter
+    this.wsGateway?.sendEvent('expenseCreated', { expense: doc });
     return doc;
   }
 
@@ -58,12 +67,13 @@ export class ExpensesService {
     Object.assign(exp, data);
     const updated = await exp.save();
     await this.auditLogService?.log({
-      userId: data.userId,
       action: 'update',
       model: 'Expense',
       documentId: id,
       changes: { before, after: updated.toObject() },
     });
+    // WebSocket: skicka event till alla klienter
+    this.wsGateway?.sendEvent('expenseUpdated', { expense: updated });
     return updated;
   }
 
@@ -75,5 +85,7 @@ export class ExpensesService {
       documentId: id,
       changes: doc?.toObject(),
     });
+    // WebSocket: skicka event till alla klienter
+    this.wsGateway?.sendEvent('expenseDeleted', { expenseId: id });
   }
 }

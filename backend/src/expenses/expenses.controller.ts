@@ -1,13 +1,55 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, Query, Inject } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 
 @Controller('expenses')
 export class ExpensesController {
+  constructor(
+    private readonly expensesService: ExpensesService,
+    @Inject('WsGateway') private readonly wsGateway: any,
+  ) {}
+
+  // Offline sync: returnera ändrade poster sedan timestamp
+  @Get('sync')
+  async sync(@Query('since') since: string) {
+    const date = since ? new Date(since) : new Date(0);
+    // Hämtar utgifter som ändrats sedan angiven tidpunkt
+    return this.expensesService.findChangedSince(date);
+  }
+
+  // Hämta auditlogg för utgifter
+  @Get('auditlog')
+  async getAuditLog() {
+    const AuditLog = (await import('../models/auditlog.schema')).default;
+    const logs = await AuditLog.find({ model: 'Expense' }).sort({ timestamp: -1 }).limit(100).exec();
+    // WebSocket: skicka event till alla klienter om senaste logg
+    if (logs.length > 0) {
+      this.wsGateway?.sendEvent('auditLogEvent', { log: logs[0] });
+    }
+    return logs;
+  }
+
+  // Statistik: summera utgifter per kategori och månad
+  @Get('stats/:year')
+  async getStats(@Param('year') year: number) {
+    return this.expensesService.getStatsByCategoryAndMonth(year);
+  }
+        // Offline sync: returnera ändrade poster sedan timestamp
+        @Get('sync')
+        async sync(@Query('since') since: string) {
+          const date = since ? new Date(since) : new Date(0);
+          // Hämtar utgifter som ändrats sedan angiven tidpunkt
+          return this.expensesService.findChangedSince(date);
+        }
       // Hämta auditlogg för utgifter
       @Get('auditlog')
       async getAuditLog() {
         const AuditLog = (await import('../models/auditlog.schema')).default;
-        return AuditLog.find({ model: 'Expense' }).sort({ timestamp: -1 }).limit(100).exec();
+        const logs = await AuditLog.find({ model: 'Expense' }).sort({ timestamp: -1 }).limit(100).exec();
+        // WebSocket: skicka event till alla klienter om senaste logg
+        if (logs.length > 0) {
+          this.wsGateway?.sendEvent('auditLogEvent', { log: logs[0] });
+        }
+        return logs;
       }
     // Statistik: summera utgifter per kategori och månad
     @Get('stats/:year')
