@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Expense, ExpenseSchema } from '../expenses/expense.schema';
 import { StatsController } from './stats.controller';
 import { ScoreService } from './score.service';
+import { WhatIfService } from './whatif.service';
 import { WsModule } from '../ws/ws.module';
 
 @Module({
@@ -11,7 +12,7 @@ import { WsModule } from '../ws/ws.module';
     WsModule,
   ],
   controllers: [StatsController],
-  providers: [ScoreService],
-  exports: [ScoreService],
+  providers: [ScoreService, WhatIfService],
+  exports: [ScoreService, WhatIfService],
 })
 export class StatsModule {}

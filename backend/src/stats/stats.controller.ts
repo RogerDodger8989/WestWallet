@@ -3,12 +3,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Expense, ExpenseDocument } from '../expenses/expense.schema';
 import { ScoreService } from './score.service';
+import { WhatIfService, WhatIfScenario } from './whatif.service';
 
 @Controller('stats')
 export class StatsController {
   constructor(
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
     private readonly scoreService: ScoreService,
+    private readonly whatIfService: WhatIfService,
     @Inject('WsGateway') private readonly wsGateway: any,
   ) {}
 
@@ -23,6 +25,23 @@ export class StatsController {
     const result = this.scoreService.calculateScore(expenses, income, debts);
     // WebSocket: skicka event till alla klienter
     this.wsGateway?.sendEvent('scoreCalculated', result);
+    return result;
+  }
+
+  @Get('whatif')
+  async getWhatIf(
+    @Query('year') year: number,
+    @Query('income') income: number,
+    @Query('debts') debts: number,
+    @Query('type') type: string,
+    @Query('percent') percent?: number,
+    @Query('assetName') assetName?: string,
+    @Query('assetValue') assetValue?: number,
+  ) {
+    const expenses = await this.expenseModel.find({ year }).exec();
+    const scenario: WhatIfScenario = { type: type as any, percent, assetName, assetValue };
+    const result = this.whatIfService.simulate(expenses, income, debts, scenario);
+    this.wsGateway?.sendEvent('whatIfSimulated', { scenario, result });
     return result;
   }
 }

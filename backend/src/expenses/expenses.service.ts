@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { AuditLogService } from '../common/auditlog.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Expense, ExpenseDocument } from './expense.schema';
@@ -27,7 +28,7 @@ export class ExpensesService {
     }
   constructor(
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
-    @Inject('AuditLogService') private readonly auditLogService: any,
+    @Inject(forwardRef(() => AuditLogService)) private readonly auditLogService: AuditLogService,
     @Inject('WsGateway') private readonly wsGateway: any,
   ) {}
 
@@ -36,7 +37,7 @@ export class ExpensesService {
     await this.auditLogService?.log({
       action: 'create',
       model: 'Expense',
-      documentId: doc._id,
+      documentId: doc._id ? doc._id.toString() : '',
       changes: data,
     });
     // WebSocket: skicka event till alla klienter

@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 
-const auditLogSchema = new Schema({
+export const auditLogSchema = new Schema({
   timestamp: { type: Date, default: Date.now },
   userId: { type: String, required: false },
   action: { type: String, required: true }, // create, update, delete, etc.

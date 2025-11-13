@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, TooManyRequestsException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, BadRequestException } from '@nestjs/common';
 import { CacheService } from '../cache/cache.service';
 
 const REQUEST_LIMIT = 200; // max requests per minut
@@ -22,16 +22,16 @@ export class RateLimitGuard implements CanActivate {
 
     // Requests
     let reqCount = await this.cacheService.get<number>(reqKey) || 0;
-    if (reqCount >= REQUEST_LIMIT) {
-      throw new TooManyRequestsException('API rate limit exceeded (requests/min)');
+        if (reqCount >= REQUEST_LIMIT) {
+          throw new BadRequestException('API rate limit exceeded (requests/min)');
     }
     await this.cacheService.set(reqKey, reqCount + 1, WINDOW_SECONDS);
 
     // Writes
     if (isWrite) {
       let writeCount = await this.cacheService.get<number>(writeKey) || 0;
-      if (writeCount >= WRITE_LIMIT) {
-        throw new TooManyRequestsException('API rate limit exceeded (writes/min)');
+          if (writeCount >= WRITE_LIMIT) {
+            throw new BadRequestException('API rate limit exceeded (writes/min)');
       }
       await this.cacheService.set(writeKey, writeCount + 1, WINDOW_SECONDS);
     }

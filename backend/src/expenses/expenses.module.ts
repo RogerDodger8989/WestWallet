@@ -5,14 +5,19 @@ import { ExpensesService } from './expenses.service';
 import { AuditLogModule } from '../common/auditlog.module';
 import { WsModule } from '../ws/ws.module';
 import { ExpensesController } from './expenses.controller';
+import { auditLogSchema } from '../models/auditlog.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Expense.name, schema: ExpenseSchema }]),
+    MongooseModule.forFeature([
+      { name: Expense.name, schema: ExpenseSchema },
+      { name: 'AuditLog', schema: auditLogSchema },
+    ]),
     AuditLogModule,
     WsModule,
   ],
   providers: [ExpensesService],
+  exports: [ExpensesService],
   controllers: [ExpensesController],
 })
 export class ExpensesModule {}
