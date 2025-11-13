@@ -1,67 +1,109 @@
-## Undo-funktion & Papperskorg
-## Bild-/filhantering
-## Trial/prenumeration
-## Köhantering (BullMQ/Nest Bull)
-## Automatiska taggar / smart kategorisering (AI optional)
+## Backend-funktioner
 
-Backend har endpoint POST /ai/categorize för att föreslå kategori baserat på text, leverantör och belopp.
+### Globalt ID-system
+- Gemensam sekvens för alla poster (A000001, A000002 ...)
+- Robust ID-generator med MongoDB counter
+- Funktion: `getNextGlobalId()` genererar nästa ID med prefix och sekvens
+- Schema-regler: ID måste matcha regex `/A\d{6}/`, fel returneras med `errorCode`
 
-## Webhooks (framtidssäkert)
+### Användarhantering & autentisering
+- User-modell med preferences, trial, roller
+- JWT-login, refresh-token, e-postverifiering
+- Read-only-läge efter trial-period
+- Adminpanel: se användare, trial-status, betalhistorik
+- Kryptering av känslig data (AES med crypto-js)
+- Lösenord hashas med bcrypt
 
-System för webhooks: /webhooks/subscribe och /webhooks/events. Händelser kan kopplas till externa appar (Discord, Slack, Home Assistant, notifieringssystem).
+### Rollhantering & behörigheter
+- Endpoints skyddade med @Roles('admin')
+- Rate limiting för mail/reset-password
 
-## Cache-lager (Redis eller Memory cache)
+### Undo-funktion & papperskorg
+- Mjukt radera (isDeleted, deletedAt)
+- Undo-knapp, restore-funktion
+- Papperskorg med lista på borttagna användare
 
-Dashboard-data, statistik, kategorier, leverantörer, användarinställningar och bildmetadata cacheas för snabbare svar.
+### Bild-/filhantering
+- /uploads/{ID}/... struktur
+- API för uppladdning och radering
 
-## Multi-tenant / Multi-user-stöd
+### Trial/prenumeration
+- Read-only-läge efter 30 dagar
+- Banner, adminfält: trial_start, trial_days_left, is_paid, payment_method
 
-Stöd för organizationId: hushåll, familjer, föreningar, företag med flera användare per organisation.
+### Import/export
+- ZIP-format, remapping av ID vid import
+- Export av bilder/filer, rapporter
 
+### Notifieringar
+- Cron-jobb för dagliga påminnelser
+- Inställningar per användare
+- Massutskick via admin
 
+### Logging & audit trail
+- Auditlog-schema och service
+- Alla ändringar i utgifter loggas automatiskt
+- Endpoint: GET /expenses/auditlog visar senaste loggar
 
-### Audit trail & loggning
+### Statistik & rapporter (aggregation pipelines)
+- GET /expenses/stats/:year summerar utgifter per kategori och månad
 
-Alla ändringar (skapa, uppdatera, radera) i utgifter loggas nu automatiskt i en auditlog.
-- Modell: `src/models/auditlog.schema.ts`
-- Service: `src/common/auditlog.service.ts`
-- Loggning sker vid create, update, delete i ExpensesService.
-- Loggen innehåller: tid, användare, typ av ändring, modell, dokument-ID, ändringar, IP.
-Exempel på loggpost:
-```json
-{
-  "timestamp": "2025-11-13T12:34:56Z",
-  "userId": "abc123",
-  "action": "update",
-  "model": "Expense",
-  "documentId": "xyz789",
-  "changes": { "before": {...}, "after": {...} },
-  "ip": "127.0.0.1"
-}
-```
+### Systemhälsa & adminpanel
+- Mailstatus, cronstatus, webhooks, uptime, disk, version
+
+### Modul-specifika endpoints
+- Ekonomihantering: transaktioner, kategorier, leverantörer
+- Avtal & abonnemang: betalningsfrekvens, status, statistik
+- Bilkostnader: bil, händelser, statistik
+- Garantier, försäkringar, hushållsunderhåll: full CRUD, notifieringar
+
+### Inställningar
+- users.preferences: notiser, UI, papperskorg, etc.
+- Adminpanel: systeminställningar
+
+### Export/rapportering
+- PDF/Excel/CSV, automatiska rapporter
+- Statistik, grafer, trendlinjer
+
+### Säkerhet & drift
+- HTTPS, .env, backup, cronjob
+
+### Bonus/AI
+- Kostnadsprognos, anomalidetektering, automatisk kategorisering
+
+### Köhantering (BullMQ/Nest Bull)
+- Tunga processer (import, PDF, mail, notiser, cronjobs, bildkomprimering) hanteras via BullMQ/Nest Bull
+- Separata workers, stabilt och skalbart
+
+### Automatiska taggar / smart kategorisering (AI optional)
+- Endpoint POST /ai/categorize för att föreslå kategori baserat på text, leverantör och belopp
+
+### Webhooks (framtidssäkert)
+- /webhooks/subscribe, /webhooks/events
+- Händelser: post skapad, avtal slutar snart, ny bild uppladdad
+- Kan kopplas till Discord, Slack, Home Assistant, externa appar
+
+### Cache-lager (Redis eller Memory cache)
+- Cachea dashboard-data, statistik, kategorier, leverantörer, användarinställningar, bildmetadata
+
+### Multi-tenant / Multi-user-stöd
+- organizationId för hushåll, familjer, föreningar, företag
+- Flera användare per organisation
+
+### API Rate-Limiting per användare
+- 200 requests/min per användare
+- 20 writes/min
+- Stoppar abuse
+
+### Avancerad felhantering
+- Alla fel i backend returnerar nu ett `errorCode`-fält, t.ex. USER_NOT_FOUND, SUPPLIER_NOT_FOUND, etc.
 
 ### Mail-teman & MJML-mallar
-
-Backend har nu stöd för avancerade e-postmallar med MJML:
+- Backend har stöd för avancerade e-postmallar med MJML
 - Mallar: välkomstmail, faktura, påminnelse, rapport
 - Fil: `src/email/mail-templates.ts`
 - Service: `src/email/mjml.service.ts`
 - Modul: `src/email/mjml.module.ts`
-Exempel på mall:
-```mjml
-<mjml>
-  <mj-body>
-    <mj-section>
-      <mj-column>
-        <mj-text font-size="22px" color="#333">Välkommen, Dennis!</mj-text>
-        <mj-text>Vi är glada att du valt WestWallet. Kom igång direkt!</mj-text>
-      </mj-column>
-    </mj-section>
-  </mj-body>
-</mjml>
-```
-Alla mail kan nu genereras med responsiv design och snygga teman.
-- Importera bankfiler
 - Generera PDF
 - Skicka mail/notiser
 - Cronjobs
