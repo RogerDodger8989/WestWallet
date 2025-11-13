@@ -2,6 +2,25 @@
 ## Bild-/filhantering
 ## Trial/prenumeration
 ## Köhantering (BullMQ/Nest Bull)
+## Automatiska taggar / smart kategorisering (AI optional)
+
+Backend har endpoint POST /ai/categorize för att föreslå kategori baserat på text, leverantör och belopp.
+
+## Webhooks (framtidssäkert)
+
+System för webhooks: /webhooks/subscribe och /webhooks/events. Händelser kan kopplas till externa appar (Discord, Slack, Home Assistant, notifieringssystem).
+
+## Cache-lager (Redis eller Memory cache)
+
+Dashboard-data, statistik, kategorier, leverantörer, användarinställningar och bildmetadata cacheas för snabbare svar.
+
+## Multi-tenant / Multi-user-stöd
+
+Stöd för organizationId: hushåll, familjer, föreningar, företag med flera användare per organisation.
+
+## API Rate-Limiting per användare
+
+200 requests/min per användare, 20 writes/min. Stoppar abuse och skyddar API.
 
 Tunga processer hanteras via BullMQ/Nest Bull:
 - Importera bankfiler
