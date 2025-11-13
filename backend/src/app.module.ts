@@ -11,6 +11,8 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { QueueModule } from './queue/queue.module';
+import { AiModule } from './ai/ai.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 dotenv.config();
 
@@ -29,6 +31,8 @@ dotenv.config();
   WalletsModule,
   UploadsModule,
   QueueModule,
+  AiModule,
+  WebhooksModule,
   ],
   controllers: [],
   providers: [],
