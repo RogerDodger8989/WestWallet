@@ -1,6 +1,7 @@
+
 ## Backend-funktioner
 
-✔ Globalt ID-system med MongoDB counter
+✔ Globalt ID-system (A000001, robust generator)
 ✔ User-modell med trial, roller, preferences
 ✔ JWT-login, refresh-token, e-postverifiering
 ✔ Read-only-läge efter trial-period
@@ -13,7 +14,7 @@
 ✔ Trial/prenumeration (read-only efter 30 dagar, adminfält)
 ✔ Import/export (ZIP, remapping, rapporter)
 ✔ Notifieringar (cron-jobb, inställningar, massutskick)
-✔ Logging & audit trail (auditlog-schema, service, endpoint)
+✔ Logging & audit trail (auditlog-schema, service, endpoint, admin-log viewer API)
 ✔ Statistik & rapporter (aggregation pipelines, /expenses/stats/:year)
 ✔ Systemhälsa & adminpanel (mailstatus, cronstatus, uptime, disk, version)
 ✔ Modul-specifika endpoints (transaktioner, kategorier, leverantörer, avtal, bilkostnader, garantier)
@@ -30,16 +31,17 @@
 ✔ Avancerad felhantering (errorCode i alla services/controllers)
 ✔ Mail-teman & MJML-mallar (välkomstmail, faktura, rapport, PDF)
 ✔ Offline sync-stöd (GET /expenses/sync?since=timestamp)
-✔ WebSockets för live-uppdateringar (post skapad, dashboard, bild uppladdad)
+✔ WebSockets för live-uppdateringar (NestJS Gateway, dashboard, bild uppladdad)
 ✔ Full subscription-hantering (trial, grace-period, Stripe-webhooks, invoice-historik)
+✔ Device management (sessions, IP, device-namn, logga ut andra sessioner)
+
+
 
 ## Backend Roadmap
 
 - Export-jobb som körs i bakgrunden
 - Event Sourcing (spara events, analyssystem)
-- Device management (sessions, IP, device-namn, logga ut andra sessioner)
 - Skapa mellanberäkningar (cacheade stats)
-- Admin-log viewer (se loggar via API)
 - Admin “impersonate user” (se användarens vy, felsök utan lösenord)
 - What-if-simulering (API för scenario-beräkning)
 - Ekonomi-hälsopoäng (score, tips, spargrad, fasta kostnader vs inkomst, skuldnivåer, volatilitet)
