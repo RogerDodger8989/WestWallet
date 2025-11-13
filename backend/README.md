@@ -79,9 +79,13 @@ Undo-tiden kan styras via preferences. Hard delete via cron-jobb kan läggas til
 $ npm install
 ```
 
-## Globalt ID-system
+### Globalt ID-system
 
-WestWallet backend använder ett globalt ID-system för alla poster (t.ex. A000001, A000002 ...). Detta hanteras av en MongoDB counter och en ID-generator:
+Genererar sekventiella globala ID:n med prefix, t.ex. `A000001`. Använder MongoDB Counter för atomär sekvens.
+
+**Schema-regler:**
+- ID måste matcha regex `/A\d{6}/`.
+- Fel returneras med `errorCode` vid sekvens- eller formatfel.
 
 - `src/utils/id-generator.ts`: Funktion `getNextGlobalId()` genererar nästa ID.
 - `src/models/counter.schema.ts`: Counter-schema för sekvensnummer.

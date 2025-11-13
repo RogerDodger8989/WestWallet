@@ -8,6 +8,9 @@ export class Budget {
   @Prop({ type: Types.ObjectId, ref: 'Category', required: true })
   category: Types.ObjectId;
 
+    @Prop({ required: false, index: true })
+    organizationId?: string;
+
   @Prop({ required: true })
   year: number;
 

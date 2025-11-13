@@ -66,12 +66,15 @@ System för webhooks: /webhooks/subscribe och /webhooks/events. Händelser kan k
 
 ### Cache-lager (Redis eller Memory cache)
 Dashboard-data, statistik, kategorier, leverantörer, användarinställningar och bildmetadata cacheas för snabbare svar.
+Alla centrala modeller (användare, kategorier, utgifter, leverantörer, budget, wallets) har nu stöd för organizationId och cache.
 
 ### Multi-tenant / Multi-user-stöd
 Stöd för organizationId: hushåll, familjer, föreningar, företag med flera användare per organisation.
+Alla relevanta modeller och endpoints kan nu hantera organizationId för isolerad data per organisation.
 
 ### API Rate-Limiting per användare
 200 requests/min per användare, 20 writes/min. Stoppar abuse och skyddar API.
+RateLimitGuard är aktiverad globalt med Redis-cache.
 
 ## Frontend
 Se `web/README.md` för frontend-specifik information.

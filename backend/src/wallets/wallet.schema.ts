@@ -8,6 +8,9 @@ export class Wallet {
   @Prop({ required: true })
   name: string;
 
+    @Prop({ required: false, index: true })
+    organizationId?: string;
+
   @Prop({ required: true })
   userId: string;
 

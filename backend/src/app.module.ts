@@ -13,6 +13,9 @@ import { UploadsModule } from './uploads/uploads.module';
 import { QueueModule } from './queue/queue.module';
 import { AiModule } from './ai/ai.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { CacheModule } from './cache/cache.module';
+import { APP_GUARD } from '@nestjs/core';
+import { RateLimitGuard } from './auth/rate-limit.guard';
 
 dotenv.config();
 
@@ -33,8 +36,14 @@ dotenv.config();
   QueueModule,
   AiModule,
   WebhooksModule,
+  CacheModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+  ],
 })
 export class AppModule {}

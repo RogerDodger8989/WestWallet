@@ -8,6 +8,9 @@ export class Expense {
   @Prop({ required: true })
   name: string;
 
+    @Prop({ required: false, index: true })
+    organizationId?: string;
+
   @Prop({ required: true })
   amount: number;
 

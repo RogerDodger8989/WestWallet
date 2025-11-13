@@ -26,6 +26,9 @@ WestWallet Backend Roadmap
    - Robust ID-generator med MongoDB counter
    - Implementerat i `src/utils/id-generator.ts` och `src/models/counter.schema.ts`.
    - Funktion: `getNextGlobalId()` genererar nästa ID med prefix och sekvens.
+   - **Schema-regler:**
+     - ID måste matcha regex `/A\d{6}/`.
+     - Fel returneras med `errorCode` vid sekvens- eller formatfel.
 
 2. Användarhantering & autentisering
     - User-modell med:

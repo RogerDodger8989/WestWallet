@@ -1,3 +1,27 @@
+22. Schema-regler för ID-system
+	- id måste matcha /A\d{6}/
+	- id räknas upp atomärt via sequence collection
+
+23. Avancerad felhantering
+	- errorCode: "SUPPLIER_NOT_FOUND"
+	- errorCode: "ID_SEQUENCE_FAILED"
+	- errorCode: "FILE_TOO_LARGE"
+	- Kan användas i frontend för proffsig UX
+
+24. Joins via Aggregation (MongoDB)
+	- Minska antalet queries med aggregation pipelines
+
+25. Premiumfunktioner
+	- Offline-stöd: backend ger diffar via /sync?since=timestamp
+	- Returnerar endast ändrade poster
+
+26. Audit trail av filer
+	- Vem laddade upp bild?
+	- Vem raderade kvitto?
+	- När?
+
+27. Avancerade mail-teman (MJML)
+	- Backend kan generera fakturamail, påminnelsemail, välkomstmail, rapportmail
 # Roadmap Backend
 
 Se detaljerad roadmap i denna fil. Huvudfilen för roadmapen är `backend/ROADMAP_BACKEND.txt`.

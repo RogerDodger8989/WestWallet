@@ -8,6 +8,9 @@ export class Supplier {
   @Prop({ required: true, unique: true })
   name: string;
 
+    @Prop({ required: false, index: true })
+    organizationId?: string;
+
   @Prop({ required: true })
   category: string;
 }
