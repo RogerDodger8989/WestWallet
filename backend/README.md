@@ -1,4 +1,5 @@
 
+
 ## Backend-funktioner
 
 ✔ Globalt ID-system (A000001, robust generator)
@@ -34,16 +35,19 @@
 ✔ WebSockets för live-uppdateringar (NestJS Gateway, dashboard, bild uppladdad)
 ✔ Full subscription-hantering (trial, grace-period, Stripe-webhooks, invoice-historik)
 ✔ Device management (sessions, IP, device-namn, logga ut andra sessioner)
+✔ Export-jobb som körs i bakgrunden
+✔ Event Sourcing (spara events, analyssystem)
+✔ Skapa mellanberäkningar (cacheade stats)
+✔ Admin “impersonate user” (se användarens vy, felsök utan lösenord)
+✔ What-if-simulering (API för scenario-beräkning)
+✔ Ekonomi-hälsopoäng (score, tips, spargrad, fasta kostnader vs inkomst, skuldnivåer, volatilitet)
+✔ Centralt konfig-API (trial days, priser, max filstorlek, notiser, max användare/org)
+✔ Billing/licenser & betalning (utökad hantering)
+
+
 
 
 
 ## Backend Roadmap
 
-- Export-jobb som körs i bakgrunden
-- Event Sourcing (spara events, analyssystem)
-- Skapa mellanberäkningar (cacheade stats)
-- Admin “impersonate user” (se användarens vy, felsök utan lösenord)
-- What-if-simulering (API för scenario-beräkning)
-- Ekonomi-hälsopoäng (score, tips, spargrad, fasta kostnader vs inkomst, skuldnivåer, volatilitet)
-- Centralt konfig-API (trial days, priser, max filstorlek, notiser, max användare/org)
-- Billing/licenser & betalning (utökad hantering)
+Alla roadmap-punkter är nu implementerade! Nya önskemål kan läggas till här.

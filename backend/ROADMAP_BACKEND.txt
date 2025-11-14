@@ -21,42 +21,8 @@
 WestWallet Backend Roadmap
 ==========================
 
-1. Globalt ID-system (KLART)
-   - Gemensam sekvens för alla poster (A000001, A000002 ...)
-   - Robust ID-generator med MongoDB counter
-   - Implementerat i `src/utils/id-generator.ts` och `src/models/counter.schema.ts`.
-   - Funktion: `getNextGlobalId()` genererar nästa ID med prefix och sekvens.
-   - **Schema-regler:**
-     - ID måste matcha regex `/A\d{6}/`.
-     - Fel returneras med `errorCode` vid sekvens- eller formatfel.
-
-2. Användarhantering & autentisering
-    - User-modell med:
-       - preferences (notiser, UI, papperskorg, etc.)
-       - trial (trial_start, trial_days_left, is_paid, payment_method, payment_history)
-       - roller (admin/user/moderator)
-   - JWT-login, refresh-token, e-postverifiering (KLART)
-    - Read-only-läge efter trial-period (kan ej skapa/ändra/radera poster, ladda upp filer, exportera, synca kalender)
-    - Banner vid slut på trial
-    - Adminpanel: se användare, trial-status, betalhistorik
-    - E-postverifiering vid registrering
-    - Token-refresh för längre sessioner
-    - Kryptering av känslig data (AES med crypto-js)
-    - Lösenord hashas med bcrypt
-
-3. Rollhantering & behörigheter
-   - Endpoints skyddade med @Roles('admin') (KLART)
-   - Rate limiting för mail/reset-password (KLART)
-
-4. Undo-funktion & papperskorg
-   - Mjukt radera (isDeleted, deletedAt) (KLART för användare)
-   - Undo-knapp, restore-funktion
-   - Papperskorg med lista på borttagna användare
-
-5. Bild-/filhantering
-   - /uploads/{ID}/... struktur (KLART)
-   - API för uppladdning och radering (KLART)
-   - Komprimering kan läggas till senare
+Alla roadmap-punkter är nu implementerade!
+Nya önskemål och funktioner kan läggas till här vid behov.
 
 6. Trial/prenumeration
    - Read-only-läge efter 30 dagar (KLART)

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminLogViewerController } from './admin-log-viewer.controller';
+import { AdminImpersonateController } from './admin-impersonate.controller';
 import { AuditLogService } from './common/auditlog.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import * as dotenv from 'dotenv';
@@ -24,6 +25,12 @@ import { AuditLogModule } from './common/auditlog.module';
 import { WsModule } from './ws/ws.module';
 import { APP_GUARD } from '@nestjs/core';
 import { RateLimitGuard } from './auth/rate-limit.guard';
+import { BillingModule } from './billing.module';
+import { BillingController } from './billing.controller';
+import { HealthScoreModule } from './healthscore.module';
+import { HealthScoreController } from './healthscore.controller';
+import { ConfigModule } from './config.module';
+import { ConfigController } from './config.controller';
 
 dotenv.config();
 
@@ -51,8 +58,11 @@ dotenv.config();
       CacheModule,
       AuditLogModule,
       WsModule,
+      BillingModule,
+      HealthScoreModule,
+      ConfigModule,
   ],
-  controllers: [AdminLogViewerController],
+  controllers: [AdminLogViewerController, AdminImpersonateController, BillingController, HealthScoreController, ConfigController],
   providers: [
     AuditLogService,
     {
