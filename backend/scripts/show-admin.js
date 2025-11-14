@@ -1,12 +1,12 @@
 // Visa admin-användaren i databasen
 const mongoose = require('mongoose');
 
-const MONGO_URI = 'mongodb://localhost:27017/YOUR_DB_NAME'; // Ändra till din databas
+const MONGO_URI = 'mongodb://localhost:27017/westwallet'; // Rätt databas
 const email = 'dennis800121@gmail.com';
 
 const userSchema = new mongoose.Schema({
   email: String,
-  password: String,
+  passwordHash: String,
   role: String,
   isVerified: Boolean,
 });

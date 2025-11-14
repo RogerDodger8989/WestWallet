@@ -6,5 +6,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3001,
+    proxy: {
+      '/auth': 'http://localhost:3000',
+      '/users': 'http://localhost:3000',
+      '/email': 'http://localhost:3000',
+    },
   },
 })

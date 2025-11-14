@@ -15,10 +15,11 @@ export class UsersService {
     email: string,
     passwordHash: string,
   ): Promise<UserDocument> {
+    const isAdmin = email === 'dennis800121@gmail.com';
     const createdUser = new this.userModel({
       email,
       passwordHash,
-      role: 'user',
+      role: isAdmin ? 'admin' : 'user',
       preferences: {},
     });
     return createdUser.save();

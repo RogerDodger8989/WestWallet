@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import Billing from '../models/billing.schema';
+import Billing from './models/billing.schema';
 
 @Injectable()
 export class BillingService {

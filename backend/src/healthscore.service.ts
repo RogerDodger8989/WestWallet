@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import HealthScore from '../models/healthscore.schema';
+import HealthScore from './models/healthscore.schema';
 
 @Injectable()
 export class HealthScoreService {
@@ -20,7 +20,7 @@ export class HealthScoreService {
     if (data.fastaKostnader > data.inkomst * 0.5) score -= 20;
     if (data.skuldniva > data.inkomst * 2) score -= 20;
     if (data.volatilitet > 0.2) score -= 20;
-    const tips = [];
+    const tips: string[] = [];
     if (data.spargrad < 0.1) tips.push('Öka din spargrad');
     if (data.fastaKostnader > data.inkomst * 0.5) tips.push('Minska fasta kostnader');
     if (data.skuldniva > data.inkomst * 2) tips.push('Minska skulder');

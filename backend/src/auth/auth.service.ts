@@ -149,9 +149,9 @@ export class AuthService {
       console.log('Ingen användare hittades med e-post:', email);
       throw new UnauthorizedException('Fel e-post eller lösenord');
     }
-    console.log('Hittad användare:', { email: user.email, hash: user.password, isVerified: user.isVerified });
-    const valid = await bcrypt.compare(password, user.password);
-    console.log('Bcrypt compare:', { input: password, hash: user.password, result: valid });
+    console.log('Hittad användare:', { email: user.email, hash: user.passwordHash, isVerified: user.isVerified });
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    console.log('Bcrypt compare:', { input: password, hash: user.passwordHash, result: valid });
     if (!valid) {
       console.log('Lösenordet matchar inte!');
       throw new UnauthorizedException('Fel e-post eller lösenord');

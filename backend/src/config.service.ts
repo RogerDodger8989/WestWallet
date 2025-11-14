@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import Config from '../models/config.schema';
+import Config from './models/config.schema';
 
 @Injectable()
 export class ConfigService {

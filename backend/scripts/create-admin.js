@@ -8,33 +8,38 @@ const password = 'lottasas123';
 const role = 'admin';
 
 const userSchema = new mongoose.Schema({
-  email: String,
-  password: String,
-  role: String,
-  isVerified: Boolean,
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  role: { type: String, default: 'user' },
+  isVerified: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
+  preferences: { type: Object, default: {} },
+  trialStart: { type: Date, default: Date.now },
+  trialDaysLeft: { type: Number, default: 30 },
+  isPaid: { type: Boolean, default: false },
+  paymentMethod: { type: String, default: null },
 });
 
 const User = mongoose.model('User', userSchema);
 
 async function createAdmin() {
   await mongoose.connect(MONGO_URI);
+  // Radera eventuell gammal admin-användare
+  await User.deleteMany({ email });
   const hash = await bcrypt.hash(password, 10);
-  const existing = await User.findOne({ email });
-  if (existing) {
-    existing.password = hash;
-    existing.role = role;
-    existing.isVerified = true;
-    await existing.save();
-    console.log('Admin uppdaterad:', email);
-  } else {
-    await User.create({
-      email,
-      password: hash,
-      role,
-      isVerified: true,
-    });
-    console.log('Admin skapad:', email);
-  }
+  await User.create({
+    email,
+    passwordHash: hash,
+    role,
+    isVerified: true,
+    isDeleted: false,
+    preferences: {},
+    trialStart: new Date(),
+    trialDaysLeft: 30,
+    isPaid: false,
+    paymentMethod: null,
+  });
+  console.log('Admin skapad:', email);
   await mongoose.disconnect();
 }
 
