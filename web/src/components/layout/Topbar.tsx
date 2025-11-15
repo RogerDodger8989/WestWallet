@@ -6,10 +6,43 @@ import { useThemeStore } from '../../store/useThemeStore';
 const Topbar: React.FC = () => {
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
+  const navigate = useNavigate();
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 shadow">
       <div className="flex items-center gap-2">
         <span className="font-bold text-blue-700 dark:text-blue-300 text-xl">💳 WestWallet</span>
+        <nav className="ml-8 flex gap-4">
+          <div className="relative group">
+            <button
+              className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none"
+              onClick={() => navigate('/dashboard')}
+              aria-label="Ekonomisk översikt"
+            >
+              <span className="text-2xl">📊</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Ekonomisk översikt</span>
+          </div>
+          <div className="relative group">
+            <button
+              className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none"
+              onClick={() => navigate('/admin/dashboard')}
+              aria-label="Adminpanel"
+            >
+              <span className="text-2xl">🛠️</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Adminpanel</span>
+          </div>
+          <div className="relative group">
+            <button
+              className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none"
+              onClick={() => navigate('/settings')}
+              aria-label="Inställningar"
+            >
+              <span className="text-2xl">⚙️</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Inställningar</span>
+          </div>
+        </nav>
       </div>
       <div className="flex items-center gap-4">
         <button

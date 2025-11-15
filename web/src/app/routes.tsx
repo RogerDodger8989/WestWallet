@@ -8,6 +8,7 @@ import ProtectedRoute from '../components/navigation/ProtectedRoute';
 import AdminRoute from '../components/navigation/AdminRoute';
 import UserDetailsPage from '../pages/admin/UserDetailsPage';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
+import DashboardPage from '../pages/dashboard/DashboardPage';
 import AdminSettingsPage from '../pages/admin/AdminSettingsPage';
 import AdminMailPage from '../pages/admin/AdminMailPage';
 import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage';
@@ -18,7 +19,8 @@ export const routes: RouteObject[] = [
     path: '/',
     element: <ProtectedRoute />,
     children: [
-      { index: true, element: <AdminDashboardPage /> },
+      { index: true, element: <DashboardPage /> },
+      { path: 'dashboard', element: <DashboardPage /> },
       { path: 'settings', element: <SettingsPage /> },
       {
         element: <AdminRoute />,
