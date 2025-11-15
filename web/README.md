@@ -1,16 +1,40 @@
-# React + Vite
+# WestWallet Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Getting Started
 
-Currently, two official plugins are available:
+1. **Install dependencies:**
+   ```sh
+   npm install
+   ```
+2. **Run the development server:**
+   ```sh
+   npm run dev
+   ```
+   The app will start on [http://localhost:3001](http://localhost:3001)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Project Structure
+- `src/pages/` – Main pages (login, admin/users, settings, etc)
+- `src/components/` – Reusable UI components
+- `src/store/` – Zustand state stores
+- `src/app/` – App shell and routing
+- `src/styles/` – Global styles
 
-## React Compiler
+## Tech Stack
+- Vite + React + TypeScript
+- Tailwind CSS
+- Zustand
+- React Router
+- Shadcn UI
+- Framer Motion
+- Recharts
+- React Icons
+- Axios
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Next Steps
+- Expand pages and features per roadmap
+- Connect to backend API
+- Add more UI components and polish
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+For questions, see the roadmap or contact the maintainer.
