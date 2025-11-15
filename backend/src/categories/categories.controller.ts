@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, BadRequestException } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 
 @Controller('categories')
@@ -7,7 +7,14 @@ export class CategoriesController {
 
   @Post()
   async create(@Body() body: { name: string }) {
-    return this.categoriesService.create(body.name);
+    try {
+      return await this.categoriesService.create(body.name);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        return { statusCode: 400, message: error.message };
+      }
+      throw error;
+    }
   }
 
   @Get()

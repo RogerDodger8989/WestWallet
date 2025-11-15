@@ -1,17 +1,267 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useCategoryStore } from '../../store/useCategoryStore';
+import { useSupplierStore } from '../../store/useSupplierStore';
+import Toast from '../../components/Toast';
+import { useEconomyStore } from '../../store/useEconomyStore';
 
 const EconomyPage: React.FC = () => {
+  // State för modaler och val
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newSupplierName, setNewSupplierName] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState('income');
+  const [month, setMonth] = useState('');
+  const [note, setNote] = useState('');
+  const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
+  const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
+
+  // Filtrera leverantörer baserat på vald kategori
+  const filteredSuppliers = suppliers.filter(s => s.categoryId === selectedCategory);
+
+  // Hämta kategorier vid sidladdning
+  React.useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  // Förvälj första kategori och leverantör vid sidladdning
+  React.useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories]);
+
+  React.useEffect(() => {
+    if (filteredSuppliers.length > 0 && !selectedSupplier) {
+      setSelectedSupplier(filteredSuppliers[0].id);
+    }
+  }, [filteredSuppliers]);
+
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
+
+  React.useEffect(() => {
+    if (error) {
+      setToast({ message: error, type: 'error' });
+    }
+  }, [error]);
+  const { items, addItem } = useEconomyStore();
+
+  // Filtrera leverantörer baserat på vald kategori
+  // (Redundant declaration removed, only one filteredSuppliers remains at the top)
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newCategoryName.trim()) {
+      await addCategory(newCategoryName.trim());
+      setTimeout(() => {
+        if (useCategoryStore.getState().error) {
+          setToast({ message: useCategoryStore.getState().error, type: 'error' });
+          useCategoryStore.setState({ error: '' });
+        } else {
+          // Välj den senast skapade kategorin
+          const latest = useCategoryStore.getState().categories.slice(-1)[0];
+          if (latest) setSelectedCategory(latest.id);
+          setToast({ message: 'Kategori skapad!', type: 'success' });
+          setShowCategoryModal(false);
+          setNewCategoryName('');
+        }
+      }, 100);
+    }
+  };
+
+  const handleAddSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newSupplierName.trim() && selectedCategory) {
+      await addSupplier(newSupplierName.trim(), selectedCategory);
+      setTimeout(() => {
+        if (useSupplierStore.getState().error) {
+          setToast({ message: useSupplierStore.getState().error, type: 'error' });
+          useSupplierStore.setState({ error: '' });
+        } else {
+          // Välj den senast skapade leverantören
+          const latest = useSupplierStore.getState().suppliers.slice(-1)[0];
+          if (latest && latest.categoryId === selectedCategory) {
+            setSelectedSupplier(latest.id);
+          }
+          setToast({ message: 'Leverantör skapad!', type: 'success' });
+          setShowSupplierModal(false);
+          setNewSupplierName('');
+        }
+      }, 100);
+    }
+  };
+
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6 text-blue-700 dark:text-blue-300">Ekonomihantering</h1>
-      {/* Här kommer formulär, tabell, bildhantering, filter och export */}
+      {/* Formulär med kategori/leverantör-dropdowns och plus-knapp */}
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+      )}
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow mb-8">
         <h2 className="font-semibold mb-4">Lägg till ny post</h2>
-        {/* Formulär för att skapa/uppdatera post */}
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
+          e.preventDefault();
+          if (!name || !amount || !type || !month || !selectedCategory || !selectedSupplier) {
+            setToast({ message: 'Fyll i alla fält!', type: 'error' });
+            return;
+          }
+          await addItem({
+            name,
+            amount: parseFloat(amount),
+            type,
+            month,
+            category: selectedCategory,
+            supplier: selectedSupplier,
+            note,
+          });
+          setToast({ message: 'Post sparad!', type: 'success' });
+          setName('');
+          setAmount('');
+          setType('income');
+          setMonth('');
+          setNote('');
+        }}>
+          <input type="text" placeholder="Namn" className="p-2 rounded border dark:bg-slate-800 dark:text-white" required value={name} onChange={e => setName(e.target.value)} />
+          <input type="number" step="0.01" placeholder="Belopp (kr)" className="p-2 rounded border dark:bg-slate-800 dark:text-white" required value={amount} onChange={e => setAmount(e.target.value)} />
+          <select className="p-2 rounded border dark:bg-slate-800 dark:text-white" required value={type} onChange={e => setType(e.target.value)}>
+            <option value="income">Inkomst</option>
+            <option value="expense">Utgift</option>
+          </select>
+          <input type="month" className="p-2 rounded border dark:bg-slate-800 dark:text-white" required value={month} onChange={e => setMonth(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <select
+              className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full"
+              required
+              value={selectedCategory}
+              onChange={e => {
+                setSelectedCategory(e.target.value);
+                fetchSuppliers(e.target.value);
+                setSelectedSupplier('');
+              }}
+            >
+              <option value="">Välj kategori</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+            <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowCategoryModal(true)}>+</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full"
+              required
+              disabled={!selectedCategory}
+              value={selectedSupplier}
+              onChange={e => setSelectedSupplier(e.target.value)}
+            >
+              <option value="">Välj leverantör</option>
+              {filteredSuppliers.map(sup => (
+                <option key={sup.id} value={sup.id}>{sup.name}</option>
+              ))}
+            </select>
+            <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(true)} disabled={!selectedCategory}>+</button>
+          </div>
+          <textarea placeholder="Notering" className="p-2 rounded border dark:bg-slate-800 dark:text-white md:col-span-2" value={note} onChange={e => setNote(e.target.value)} />
+          <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 md:col-span-2">Lägg till</button>
+        </form>
+        {/* Modal för ny kategori */}
+        {showCategoryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <form className="bg-white dark:bg-slate-900 p-6 rounded shadow w-80" onSubmit={handleAddCategory}>
+              <h3 className="font-semibold mb-2">Ny kategori</h3>
+              <input
+                type="text"
+                placeholder="Kategorinamn"
+                className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-4"
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                required
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCategory(e);
+                  }
+                }}
+              />
+              <div className="flex gap-2 justify-end">
+                <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => setShowCategoryModal(false)}>Avbryt</button>
+                <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">Spara</button>
+              </div>
+            </form>
+          </div>
+        )}
+        {/* Modal för ny leverantör */}
+        {showSupplierModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <form className="bg-white dark:bg-slate-900 p-6 rounded shadow w-80" onSubmit={handleAddSupplier}>
+              <h3 className="font-semibold mb-2">Ny leverantör</h3>
+              <input
+                type="text"
+                placeholder="Leverantörsnamn"
+                className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-4"
+                value={newSupplierName}
+                onChange={e => setNewSupplierName(e.target.value)}
+                required
+                autoFocus
+                disabled={!selectedCategory}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSupplier(e);
+                  }
+                }}
+              />
+              <div className="flex gap-2 justify-end">
+                <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(false)}>Avbryt</button>
+                <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded" disabled={!selectedCategory}>Spara</button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow">
         <h2 className="font-semibold mb-4">Transaktioner</h2>
-        {/* Tabell med poster, filter, bildhantering, export */}
+        {items.length === 0 ? (
+          <div className="text-gray-500">Inga poster sparade ännu.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-blue-100 dark:bg-slate-800">
+                  <th className="px-2 py-1">Månad</th>
+                  <th className="px-2 py-1">ID</th>
+                  <th className="px-2 py-1">Namn</th>
+                  <th className="px-2 py-1">Typ</th>
+                  <th className="px-2 py-1">Kategori</th>
+                  <th className="px-2 py-1">Leverantör</th>
+                  <th className="px-2 py-1">Belopp</th>
+                  <th className="px-2 py-1">Notering</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(item => (
+                  <tr key={item.id} className="border-b">
+                    <td className="px-2 py-1">{item.month}</td>
+                    <td className="px-2 py-1">{item.id}</td>
+                    <td className="px-2 py-1">{item.name}</td>
+                    <td className="px-2 py-1">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
+                    <td className="px-2 py-1">{item.category}</td>
+                    <td className="px-2 py-1">{item.supplier}</td>
+                    <td className="px-2 py-1">{item.amount.toFixed(2)} kr</td>
+                    <td className="px-2 py-1">{item.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

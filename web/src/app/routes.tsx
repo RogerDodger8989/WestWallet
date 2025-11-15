@@ -12,6 +12,7 @@ import DashboardPage from '../pages/dashboard/DashboardPage';
 import AdminSettingsPage from '../pages/admin/AdminSettingsPage';
 import AdminMailPage from '../pages/admin/AdminMailPage';
 import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage';
+import EconomyPage from '../pages/economy/EconomyPage';
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
@@ -21,6 +22,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'economy', element: <EconomyPage /> },
       { path: 'settings', element: <SettingsPage /> },
       {
         element: <AdminRoute />,

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, Query, BadRequestException } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 
 @Controller('suppliers')
@@ -6,14 +6,20 @@ export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 
   @Post()
-  async create(@Body() body: { name: string, category: string }) {
-  console.log('REQ BODY:', body);
-  return this.suppliersService.create(body.name, body.category);
+  async create(@Body() body: { name: string, categoryId: string }) {
+    try {
+      return await this.suppliersService.create(body.name, body.categoryId);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        return { statusCode: 400, message: error.message };
+      }
+      throw error;
+    }
   }
 
   @Get()
-  async findAll() {
-    return this.suppliersService.findAll();
+  async findAll(@Query('categoryId') categoryId?: string) {
+    return this.suppliersService.findAll(categoryId);
   }
 
   @Get(':id')
