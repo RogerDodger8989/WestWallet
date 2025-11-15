@@ -1,40 +1,32 @@
 # WestWallet Frontend
 
-## Getting Started
+## Kom igång
 
-1. **Install dependencies:**
+1. Installera beroenden:
    ```sh
    npm install
    ```
-2. **Run the development server:**
+2. Starta dev-server:
    ```sh
    npm run dev
    ```
-   The app will start on [http://localhost:3001](http://localhost:3001)
+3. Öppna http://localhost:5173 i webbläsaren.
 
-## Project Structure
-- `src/pages/` – Main pages (login, admin/users, settings, etc)
-- `src/components/` – Reusable UI components
-- `src/store/` – Zustand state stores
-- `src/app/` – App shell and routing
-- `src/styles/` – Global styles
+## Funktioner
+- Inloggning och admin/user-flöden
+- Dashboard med ekonomisk översikt
+- Adminpanel med användarhantering
+- Inställningar och tema (ljus/mörk)
+- Navigering via topbar med ikoner och tooltips
 
-## Tech Stack
-- Vite + React + TypeScript
-- Tailwind CSS
-- Zustand
-- React Router
-- Shadcn UI
-- Framer Motion
-- Recharts
-- React Icons
-- Axios
+## Roadmap & Specifikation
+Se [ROADMAP.md](../ROADMAP.md) för komplett kravlista och projektplan.
 
-## Next Steps
-- Expand pages and features per roadmap
-- Connect to backend API
-- Add more UI components and polish
+## Nästa steg
+- Koppla backend-data
+- Lägg till fler dashboards och widgets
+- Förbättra UI/UX och responsivitet
 
 ---
 
-For questions, see the roadmap or contact the maintainer.
+WestWallet är byggt med Vite, React, TypeScript, Tailwind, Zustand, React Router, Recharts och Shadcn UI.
