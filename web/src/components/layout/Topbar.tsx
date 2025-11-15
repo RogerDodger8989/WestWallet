@@ -13,35 +13,43 @@ const Topbar: React.FC = () => {
         <span className="font-bold text-blue-700 dark:text-blue-300 text-xl">💳 WestWallet</span>
         <nav className="ml-8 flex gap-4">
           <div className="relative group">
-            <button
-              className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none"
-              onClick={() => navigate('/dashboard')}
-              aria-label="Ekonomisk översikt"
-            >
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/dashboard')} aria-label="Dashboard">
               <span className="text-2xl">📊</span>
             </button>
-            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Ekonomisk översikt</span>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Dashboard</span>
           </div>
           <div className="relative group">
-            <button
-              className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none"
-              onClick={() => navigate('/admin/dashboard')}
-              aria-label="Adminpanel"
-            >
-              <span className="text-2xl">🛠️</span>
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/economy')} aria-label="Ekonomihantering">
+              <span className="text-2xl">💰</span>
             </button>
-            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Adminpanel</span>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Ekonomihantering</span>
           </div>
           <div className="relative group">
-            <button
-              className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none"
-              onClick={() => navigate('/settings')}
-              aria-label="Inställningar"
-            >
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/contracts')} aria-label="Avtal & abonnemang">
+              <span className="text-2xl">📄</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Avtal & abonnemang</span>
+          </div>
+          <div className="relative group">
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/cars')} aria-label="Bilkostnader">
+              <span className="text-2xl">🚗</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Bilkostnader</span>
+          </div>
+          <div className="relative group">
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/settings')} aria-label="Inställningar">
               <span className="text-2xl">⚙️</span>
             </button>
             <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Inställningar</span>
           </div>
+          {user?.role === 'admin' && (
+            <div className="relative group">
+              <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/admin/dashboard')} aria-label="Adminpanel">
+                <span className="text-2xl">🛠️</span>
+              </button>
+              <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Adminpanel</span>
+            </div>
+          )}
         </nav>
       </div>
       <div className="flex items-center gap-4">

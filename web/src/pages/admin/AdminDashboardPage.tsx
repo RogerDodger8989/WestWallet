@@ -4,8 +4,10 @@ import { useAdminStore } from '../../store/useAdminStore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const AdminDashboardPage: React.FC = () => {
-  const { users } = useAdminStore();
-  // Mock data for chart
+  const { users, fetchUsers } = useAdminStore();
+  React.useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
   const data = [
     { name: 'Admins', value: users.filter(u => u.role === 'admin').length },
     { name: 'Users', value: users.filter(u => u.role === 'user').length },
