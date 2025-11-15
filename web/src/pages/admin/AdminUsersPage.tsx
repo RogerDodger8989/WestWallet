@@ -47,6 +47,14 @@ const AdminUsersPage: React.FC = () => {
                   className="px-2 py-1 bg-yellow-400 rounded mr-2"
                   onClick={() => { setEditUser(user); setModalOpen(true); }}
                 >Redigera</button>
+                <button
+                  className="px-2 py-1 bg-red-500 text-white rounded"
+                  onClick={async () => {
+                    if (window.confirm(`Radera användare ${user.name}?`)) {
+                      await useAdminStore.getState().deleteUser(user.id);
+                    }
+                  }}
+                >Radera</button>
               </td>
             </tr>
           ))}

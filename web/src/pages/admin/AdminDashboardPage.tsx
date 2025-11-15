@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAdminStore } from '../../store/useAdminStore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -23,7 +24,7 @@ const AdminDashboardPage: React.FC = () => {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-6 mb-8">
         <div className="bg-white dark:bg-slate-900 p-6 rounded shadow">
           <h2 className="font-semibold mb-2">Totalt antal användare</h2>
           <div className="text-3xl font-bold text-blue-600 dark:text-blue-300">{users.length}</div>
@@ -32,6 +33,14 @@ const AdminDashboardPage: React.FC = () => {
           <h2 className="font-semibold mb-2">Antal admins</h2>
           <div className="text-3xl font-bold text-blue-600 dark:text-blue-300">{data[0].value}</div>
         </div>
+      </div>
+      <div className="mt-4">
+        <Link
+          to="/admin/users"
+          className="inline-block px-6 py-3 bg-blue-600 text-white rounded shadow hover:bg-blue-700 font-semibold"
+        >
+          Hantera användare
+        </Link>
       </div>
     </div>
   );

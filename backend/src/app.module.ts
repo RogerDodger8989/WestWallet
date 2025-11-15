@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AdminController } from './admin/admin.controller';
+import { AdminService } from './admin/admin.service';
 import { AdminLogViewerController } from './admin-log-viewer.controller';
 import { AdminImpersonateController } from './admin-impersonate.controller';
 import { AuditLogService } from './common/auditlog.service';
@@ -62,13 +64,14 @@ dotenv.config();
       HealthScoreModule,
       ConfigModule,
   ],
-  controllers: [AdminLogViewerController, AdminImpersonateController, BillingController, HealthScoreController, ConfigController],
+  controllers: [AdminController, AdminLogViewerController, AdminImpersonateController, BillingController, HealthScoreController, ConfigController],
   providers: [
     AuditLogService,
     {
       provide: APP_GUARD,
       useClass: RateLimitGuard,
     },
+    AdminService,
   ],
 })
 export class AppModule {}

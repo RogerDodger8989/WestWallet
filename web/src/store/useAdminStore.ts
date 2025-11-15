@@ -1,4 +1,6 @@
+
 import { create } from 'zustand';
+import { adminApi } from '../api/adminApi';
 
 interface User {
   id: string;
@@ -11,34 +13,53 @@ interface AdminState {
   users: User[];
   loading: boolean;
   error: string;
-  fetchUsers: () => void;
-  addUser: (user: Omit<User, 'id'>) => void;
-  updateUser: (user: User) => void;
+  fetchUsers: () => Promise<void>;
+  addUser: (user: Omit<User, 'id'>) => Promise<void>;
+  updateUser: (user: User) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
 }
 
 export const useAdminStore = create<AdminState>((set, get) => ({
   users: [],
   loading: false,
   error: '',
-  fetchUsers: () => {
+  fetchUsers: async () => {
     set({ loading: true, error: '' });
-    // Mock fetch, replace with real API call
-    setTimeout(() => {
-      set({
-        users: [
-          { id: '1', name: 'Admin', email: 'admin@westwallet.se', role: 'admin' },
-          { id: '2', name: 'User', email: 'user@westwallet.se', role: 'user' },
-        ],
-        loading: false,
-        error: '',
-      });
-    }, 1000);
+    try {
+      const users = await adminApi.getUsers();
+      set({ users, loading: false });
+    } catch (error: any) {
+      set({ error: error.message || 'Kunde inte hämta användare', loading: false });
+    }
   },
-  addUser: (user) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    set({ users: [...get().users, { ...user, id }] });
+  addUser: async (user) => {
+    set({ loading: true, error: '' });
+    try {
+      await adminApi.createUser(user);
+      await get().fetchUsers();
+      set({ loading: false });
+    } catch (error: any) {
+      set({ error: error.message || 'Kunde inte skapa användare', loading: false });
+    }
   },
-  updateUser: (user) => {
-    set({ users: get().users.map(u => u.id === user.id ? user : u) });
+  updateUser: async (user) => {
+    set({ loading: true, error: '' });
+    try {
+      await adminApi.updateUser(user);
+      await get().fetchUsers();
+      set({ loading: false });
+    } catch (error: any) {
+      set({ error: error.message || 'Kunde inte uppdatera användare', loading: false });
+    }
+  },
+  deleteUser: async (id) => {
+    set({ loading: true, error: '' });
+    try {
+      await adminApi.deleteUser(id);
+      await get().fetchUsers();
+      set({ loading: false });
+    } catch (error: any) {
+      set({ error: error.message || 'Kunde inte radera användare', loading: false });
+    }
   },
 }));
