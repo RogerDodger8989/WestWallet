@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { EconomyItem } from '../../store/useEconomyStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
 import Toast from '../../components/Toast';
 import { useEconomyStore } from '../../store/useEconomyStore';
+import { uploadImage, deleteImage, getImages } from '../../api/imageApi';
 
 const EconomyPage: React.FC = () => {
       // Modal för notering
@@ -27,6 +28,13 @@ const EconomyPage: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<EconomyItem | null>(null);
+  // Bildhantering
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageList, setImageList] = useState<string[]>([]);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [overlayImage, setOverlayImage] = useState<string|null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, _setSelectedCategory] = useState(() => localStorage.getItem('selectedCategory') || '');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -379,8 +387,110 @@ const EconomyPage: React.FC = () => {
                       <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
                         title={item.images && item.images.length > 0 ? 'Bilder finns' : 'Inga bilder'}
                         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
-                        onClick={() => {/* öppna bildmodal här */}}
+                        onClick={async () => {
+                          setSelectedItem(item);
+                          setShowImageModal(true);
+                          setImageLoading(true);
+                          try {
+                            const imgs = await getImages(item.id);
+                            setImageList(imgs);
+                            setImageError('');
+                          } catch (err: any) {
+                            setImageError('Kunde inte hämta bilder');
+                          }
+                          setImageLoading(false);
+                        }}
                       />
+                          {/* Modal för bildhantering */}
+                          {showImageModal && selectedItem && (
+                            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                              <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-[500px] max-h-[80vh] overflow-y-auto relative">
+                                <h3 className="font-semibold mb-2">Bilder för post: {selectedItem.displayId}</h3>
+                                {imageError && <div className="text-red-600 mb-2">{imageError}</div>}
+                                <div
+                                  className="border-2 border-dashed rounded p-4 mb-4 text-center cursor-pointer bg-gray-50"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                                  onDrop={async e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const files = Array.from(e.dataTransfer.files);
+                                    setImageLoading(true);
+                                    try {
+                                      await uploadImage(selectedItem.id, files as File[]);
+                                      const imgs = await getImages(selectedItem.id);
+                                      setImageList(imgs);
+                                      setImageError('');
+                                    } catch (err: any) {
+                                      setImageError('Kunde inte ladda upp bilder');
+                                    }
+                                    setImageLoading(false);
+                                  }}
+                                >
+                                  <input
+                                    type="file"
+                                    multiple
+                                    ref={fileInputRef}
+                                    style={{ display: 'none' }}
+                                    onChange={async e => {
+                                      if (!e.target.files) return;
+                                      setImageLoading(true);
+                                      try {
+                                        await uploadImage(selectedItem.id, Array.from(e.target.files));
+                                        const imgs = await getImages(selectedItem.id);
+                                        setImageList(imgs);
+                                        setImageError('');
+                                      } catch (err: any) {
+                                        setImageError('Kunde inte ladda upp bilder');
+                                      }
+                                      setImageLoading(false);
+                                    }}
+                                  />
+                                  <span className="text-gray-600">Dra in bilder här eller klicka för att välja filer</span>
+                                </div>
+                                <div className="flex flex-wrap gap-3 mb-4">
+                                  {imageLoading ? <span>Laddar bilder...</span> : null}
+                                  {imageList.length === 0 && !imageLoading ? <span className="text-gray-400">Inga bilder uppladdade.</span> : null}
+                                  {imageList.map(img => (
+                                    <div key={img} className="relative group">
+                                      <img
+                                        src={img}
+                                        alt="thumbnail"
+                                        className="w-20 h-20 object-cover rounded shadow cursor-pointer border border-gray-300"
+                                        onClick={() => setOverlayImage(img)}
+                                      />
+                                      <button
+                                        className="absolute top-1 right-1 bg-red-600 text-white rounded px-2 py-1 text-xs opacity-80 group-hover:opacity-100"
+                                        title="Ta bort bild"
+                                        onClick={async e => {
+                                          e.stopPropagation();
+                                          setImageLoading(true);
+                                          try {
+                                            await deleteImage(selectedItem.id, img);
+                                            const imgs = await getImages(selectedItem.id);
+                                            setImageList(imgs);
+                                            setImageError('');
+                                          } catch (err: any) {
+                                            setImageError('Kunde inte ta bort bild');
+                                          }
+                                          setImageLoading(false);
+                                        }}
+                                      >🗑️</button>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex gap-2 justify-end mt-4">
+                                  <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowImageModal(false); setSelectedItem(null); setImageList([]); setOverlayImage(null); }}>Stäng</button>
+                                </div>
+                                {/* Overlay för stor bild */}
+                                {overlayImage && (
+                                  <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setOverlayImage(null)}>
+                                    <img src={overlayImage} alt="stor bild" className="max-w-[80vw] max-h-[80vh] rounded shadow-lg" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                     </td>
                     <td className="px-2 py-1 text-center" style={{ position: 'relative' }}>
                       <span

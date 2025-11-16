@@ -5,6 +5,7 @@ import { ExpensesService } from './expenses.service';
 import { AuditLogModule } from '../common/auditlog.module';
 import { WsModule } from '../ws/ws.module';
 import { ExpensesController } from './expenses.controller';
+import { ImagesController } from './images.controller';
 import { auditLogSchema } from '../models/auditlog.schema';
 
 @Module({
@@ -18,6 +19,6 @@ import { auditLogSchema } from '../models/auditlog.schema';
   ],
   providers: [ExpensesService],
   exports: [ExpensesService],
-  controllers: [ExpensesController],
+  controllers: [ExpensesController, ImagesController],
 })
 export class ExpensesModule {}

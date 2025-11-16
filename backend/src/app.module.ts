@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { imageConfig } from './config/image.config';
+import * as express from 'express';
 import { AdminController } from './admin/admin.controller';
 import { AdminService } from './admin/admin.service';
 import { AdminLogViewerController } from './admin-log-viewer.controller';
@@ -12,6 +15,9 @@ import { EmailModule } from './email/email.module';
 import { MJMLModule } from './email/mjml.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ExpensesModule } from './expenses/expenses.module';
+import { ImagesModule } from './expenses/images.module';
+import { ImageSettingsModule } from './config/image-settings.module';
+import { ImageCategoriesModule } from './config/image-categories.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { DevicesModule } from './devices/devices.module';
@@ -47,6 +53,9 @@ dotenv.config();
       MJMLModule,
       CategoriesModule,
       ExpensesModule,
+      ImagesModule,
+      ImageSettingsModule,
+      ImageCategoriesModule,
       SuppliersModule,
       BudgetsModule,
       DevicesModule,
@@ -74,4 +83,13 @@ dotenv.config();
     AdminService,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Servera bilder från valda sökvägen under /uploads
+    consumer
+      .apply((req, res, next) => {
+        express.static(imageConfig.localPath)(req, res, next);
+      })
+      .forRoutes('/uploads');
+  }
+}
