@@ -9,6 +9,7 @@ export interface EconomyItem {
   supplier: string;
   note?: string;
   month: string;
+  year: number;
   images?: string[];
 }
 
@@ -17,7 +18,16 @@ interface EconomyState {
   loading: boolean;
   error: string;
   fetchItems: () => Promise<void>;
-  addItem: (item: Omit<EconomyItem, 'id'>) => Promise<void>;
+  addItem: (item: {
+    name: string;
+    amount: number;
+    type: 'income' | 'expense';
+    category: string;
+    supplier: string;
+    note?: string;
+    year: number;
+    month: number;
+  }) => Promise<void>;
   updateItem: (item: EconomyItem) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
 }

@@ -94,8 +94,10 @@ const EconomyPage: React.FC = () => {
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Månad som YYYY-MM
-    const monthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    // Hämta år och månad som number
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
     await addItem({
       name,
       amount: Number(amount),
@@ -103,7 +105,8 @@ const EconomyPage: React.FC = () => {
       category: selectedCategory,
       supplier: selectedSupplier,
       note,
-      month: monthStr,
+      year,
+      month,
     });
     setToast({ message: 'Post sparad!', type: 'success' });
     setName('');
@@ -134,7 +137,8 @@ const EconomyPage: React.FC = () => {
             name,
             amount: parseFloat(amount),
             type: type as 'income' | 'expense',
-            month: monthStr,
+            year,
+            month: monthNum,
             category: selectedCategory,
             supplier: selectedSupplier,
             note,

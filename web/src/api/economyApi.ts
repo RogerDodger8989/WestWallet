@@ -8,7 +8,7 @@ export async function fetchEconomyItems(): Promise<EconomyItem[]> {
 	return res.data;
 }
 
-export async function addEconomyItem(item: Omit<EconomyItem, 'id'>): Promise<EconomyItem> {
+export async function addEconomyItem(item: { [key: string]: any }): Promise<EconomyItem> {
 	const res = await axios.post(API_URL, item);
 	return res.data;
 }
