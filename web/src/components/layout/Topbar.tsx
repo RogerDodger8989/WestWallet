@@ -37,6 +37,18 @@ const Topbar: React.FC = () => {
             <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Bilkostnader</span>
           </div>
           <div className="relative group">
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/inventory')} aria-label="Inventering">
+              <span className="text-2xl">📦</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Inventering</span>
+          </div>
+          <div className="relative group">
+            <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/warranty')} aria-label="Garantier & Försäkringar">
+              <span className="text-2xl">🛡️</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs rounded bg-slate-800 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">Garantier & Försäkringar</span>
+          </div>
+          <div className="relative group">
             <button className="p-2 rounded transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none" onClick={() => navigate('/settings')} aria-label="Inställningar">
               <span className="text-2xl">⚙️</span>
             </button>

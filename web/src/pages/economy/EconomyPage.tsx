@@ -392,7 +392,7 @@ const EconomyPage: React.FC = () => {
                           setShowImageModal(true);
                           setImageLoading(true);
                           try {
-                            const imgs = await getImages(item.id);
+                            const imgs = await getImages(item.id, 'economy');
                             setImageList(imgs);
                             setImageError('');
                           } catch (err: any) {
@@ -417,8 +417,8 @@ const EconomyPage: React.FC = () => {
                                     const files = Array.from(e.dataTransfer.files);
                                     setImageLoading(true);
                                     try {
-                                      await uploadImage(selectedItem.id, files as File[]);
-                                      const imgs = await getImages(selectedItem.id);
+                                      await uploadImage(selectedItem.id, files as File[], 'economy');
+                                      const imgs = await getImages(selectedItem.id, 'economy');
                                       setImageList(imgs);
                                       setImageError('');
                                     } catch (err: any) {
@@ -436,8 +436,8 @@ const EconomyPage: React.FC = () => {
                                       if (!e.target.files) return;
                                       setImageLoading(true);
                                       try {
-                                        await uploadImage(selectedItem.id, Array.from(e.target.files));
-                                        const imgs = await getImages(selectedItem.id);
+                                        await uploadImage(selectedItem.id, Array.from(e.target.files), 'economy');
+                                        const imgs = await getImages(selectedItem.id, 'economy');
                                         setImageList(imgs);
                                         setImageError('');
                                       } catch (err: any) {
@@ -466,8 +466,8 @@ const EconomyPage: React.FC = () => {
                                           e.stopPropagation();
                                           setImageLoading(true);
                                           try {
-                                            await deleteImage(selectedItem.id, img);
-                                            const imgs = await getImages(selectedItem.id);
+                                            await deleteImage(selectedItem.id, img, 'economy');
+                                            const imgs = await getImages(selectedItem.id, 'economy');
                                             setImageList(imgs);
                                             setImageError('');
                                           } catch (err: any) {

@@ -35,13 +35,24 @@ const ImageCategorySettings: React.FC = () => {
   if (loading) return <div>Laddar bildkategorier...</div>;
   if (error) return <div className="text-red-600">{error}</div>;
 
+  const icons: Record<string, string> = {
+    economy: '💰',
+    contracts: '📄',
+    car: '🚗',
+    inventory: '📦',
+    warranty: '🛡️',
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-96 mt-8">
       <h3 className="font-semibold mb-2">Bildmappar per meny</h3>
       <ul>
         {categories.map(cat => (
           <li key={cat.key} className="mb-4">
-            <div className="font-semibold mb-1">{cat.name}</div>
+            <div className="font-semibold mb-1 flex items-center gap-2">
+              <span className="text-2xl">{icons[cat.key] || '📁'}</span>
+              {cat.name}
+            </div>
             <input
               type="text"
               value={editPaths[cat.key] || ''}
