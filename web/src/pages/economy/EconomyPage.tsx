@@ -381,7 +381,7 @@ const EconomyPage: React.FC = () => {
                     <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
                     <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
                     <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
-                    <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toFixed(2)} kr</td>
+                    <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr</td>
                     <td className="px-2 py-1 text-center">
                       <span
                         className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
@@ -487,12 +487,14 @@ const EconomyPage: React.FC = () => {
                                             const imgs = await getImages(selectedItem.id, 'economy');
                                             setImageList(imgs);
                                             setImageError('');
-                                            // Uppdatera images-arrayen för rätt item i Zustand-store
                                             useEconomyStore.setState(state => ({
                                               items: state.items.map(i =>
                                                 i.id === selectedItem.id ? { ...i, images: imgs } : i
                                               )
                                             }));
+                                            // Visa UndoToast för bildradering
+                                            setToast({ message: 'Bild raderad!', type: 'error' });
+                                            setTimeout(() => setToast(null), 3000);
                                           } catch (err: any) {
                                             setImageError('Kunde inte ta bort bild');
                                           }

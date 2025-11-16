@@ -3,6 +3,8 @@ import { getImageSettings } from '../api/imageSettingsApi';
 import { updateImageSettings } from '../api/updateImageSettingsApi';
 
 const ImageSettings: React.FC = () => {
+    const [showMoveModal, setShowMoveModal] = useState(false);
+    const [pendingPath, setPendingPath] = useState('');
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,6 +40,11 @@ const ImageSettings: React.FC = () => {
       <form
         onSubmit={async e => {
           e.preventDefault();
+          if (editPath !== settings.localPath) {
+            setPendingPath(editPath);
+            setShowMoveModal(true);
+            return;
+          }
           setSaving(true);
           try {
             const updated = await updateImageSettings(editPath);
@@ -97,6 +104,31 @@ const ImageSettings: React.FC = () => {
         >Återställ till standard</button>
       </form>
       {error && <div className="text-red-600 mt-2">{error}</div>}
+      {showMoveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50" onClick={() => setShowMoveModal(false)}>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-96" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold mb-2">Flytta bilder?</h3>
+            <p>Vill du flytta alla bilder till den nya mappen?<br />Bilderna behåller sina ID-mappar.</p>
+            <div className="flex gap-2 justify-end mt-4">
+              <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => setShowMoveModal(false)}>Avbryt</button>
+              <button type="button" className="px-3 py-1 bg-blue-600 text-white rounded" onClick={async () => {
+                setShowMoveModal(false);
+                setSaving(true);
+                try {
+                  // Här ska flyttlogik implementeras
+                  const updated = await updateImageSettings(pendingPath);
+                  setSettings(updated);
+                  setEditPath(pendingPath);
+                  setError('');
+                } catch {
+                  setError('Kunde inte spara ny sökväg');
+                }
+                setSaving(false);
+              }}>Flytta och spara</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
