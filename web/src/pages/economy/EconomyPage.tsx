@@ -374,10 +374,10 @@ const EconomyPage: React.FC = () => {
                   .filter(item => /^[a-fA-F0-9]{24}$/.test(item.id))
                   .filter(item => item.name && item.category && item.supplier && typeof item.amount === 'number')
                   .map((item, index) => (
-                  <tr key={(item.id || '') + '-' + index} className="border-b text-center">
+                  <tr key={(item.id || '') + '-' + index} className="border-b text-center hover:bg-blue-100 transition-colors">
                     <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
                     <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
-                    <td className="px-2 py-1 text-center">{item.name}</td>
+                     <td className="px-2 py-1 text-center hover:bg-blue-100">{item.name}</td>
                     <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
                     <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
                     <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
