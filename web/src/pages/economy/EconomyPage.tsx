@@ -261,27 +261,36 @@ const EconomyPage: React.FC = () => {
                   <th className="px-2 py-1">Kategori</th>
                   <th className="px-2 py-1">Leverantör</th>
                   <th className="px-2 py-1">Belopp</th>
+                  <th className="px-2 py-1">Bild</th>
                   <th className="px-2 py-1">Notering</th>
+                  <th className="px-2 py-1">Åtgärder</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, index) => (
                   <tr key={(item.id || '') + '-' + index} className="border-b text-center">
-                    <td className="px-2 py-1 text-center">{item.month}</td>
-                    <td className="px-2 py-1 text-center flex items-center justify-center gap-2">
-                      {item.id}
-                      {/* Bild-ikon: grön om bilder finns, röd annars */}
-                      <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        title={item.images && item.images.length > 0 ? 'Bilder finns' : 'Inga bilder'}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => {/* öppna bildmodal här */}}
-                      />
-                    </td>
+                    <td className="px-2 py-1 text-center">{
+                      // Visa alltid månad som YYYY-MM
+                      (() => {
+                        if (item.month && /^\d{4}-\d{2}$/.test(item.month)) return item.month;
+                        const year = item.year || new Date().getFullYear();
+                        const monthNum = String(item.month).padStart(2, '0');
+                        return `${year}-${monthNum}`;
+                      })()
+                    }</td>
+                    <td className="px-2 py-1 text-center">{item.id}</td>
                     <td className="px-2 py-1 text-center">{item.name}</td>
                     <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
                     <td className="px-2 py-1 text-center">{item.category}</td>
                     <td className="px-2 py-1 text-center">{item.supplier}</td>
                     <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toFixed(2)} kr</td>
+                    <td className="px-2 py-1 text-center flex items-center justify-center">
+                      <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                        title={item.images && item.images.length > 0 ? 'Bilder finns' : 'Inga bilder'}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                        onClick={() => {/* öppna bildmodal här */}}
+                      />
+                    </td>
                     <td className="px-2 py-1 text-center">{item.note}</td>
                     <td className="px-2 py-1 text-center">
                       {/* Redigeringsknapp */}
