@@ -33,7 +33,7 @@ export class Expense {
   supplier?: string;
 
   @Prop()
-  notes?: string;
+  note?: string;
 }
 
 export const ExpenseSchema = SchemaFactory.createForClass(Expense);
