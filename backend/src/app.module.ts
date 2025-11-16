@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { imageConfig } from './config/image.config';
+import { imageCategories } from './config/image-categories.config';
 import * as express from 'express';
 import { AdminController } from './admin/admin.controller';
 import { AdminService } from './admin/admin.service';
@@ -44,6 +46,10 @@ dotenv.config();
 
 @Module({
   imports: [
+      ServeStaticModule.forRoot({
+        rootPath: imageConfig.localPath,
+        serveRoot: '/uploads',
+      }),
       MongooseModule.forRoot(
         process.env.MONGODB_URI || 'mongodb://localhost:27017/westwallet',
       ),
@@ -83,13 +89,4 @@ dotenv.config();
     AdminService,
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    // Servera bilder från valda sökvägen under /uploads
-    consumer
-      .apply((req, res, next) => {
-        express.static(imageConfig.localPath)(req, res, next);
-      })
-      .forRoutes('/uploads');
-  }
-}
+export class AppModule {}

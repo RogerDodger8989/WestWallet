@@ -466,7 +466,8 @@ const EconomyPage: React.FC = () => {
                                           e.stopPropagation();
                                           setImageLoading(true);
                                           try {
-                                            await deleteImage(selectedItem.id, img, 'economy');
+                                            const filename = img.split('/').pop() || img;
+                                            await deleteImage(selectedItem.id, filename, 'economy');
                                             const imgs = await getImages(selectedItem.id, 'economy');
                                             setImageList(imgs);
                                             setImageError('');

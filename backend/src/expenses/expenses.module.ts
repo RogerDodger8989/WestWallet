@@ -18,7 +18,7 @@ import { auditLogSchema } from '../models/auditlog.schema';
     WsModule,
   ],
   providers: [ExpensesService],
-  exports: [ExpensesService],
+  exports: [ExpensesService, MongooseModule],
   controllers: [ExpensesController, ImagesController],
 })
 export class ExpensesModule {}

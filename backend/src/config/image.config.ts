@@ -9,7 +9,7 @@ export interface ImageConfig {
 import * as os from 'os';
 import * as path from 'path';
 
-const defaultDocumentsPath = path.join(os.homedir(), 'Documents', 'WestWallet', '.uploads');
+const defaultDocumentsPath = path.join(__dirname, '../../uploads');
 
 export const imageConfig: ImageConfig = {
   storage: 'local', // 'local' eller 's3'
