@@ -382,11 +382,32 @@ const EconomyPage: React.FC = () => {
                         onClick={() => {/* öppna bildmodal här */}}
                       />
                     </td>
-                    <td className="px-2 py-1 text-center">
-                      <span className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        title={item.note && item.note.length > 0 ? 'Notering finns' : 'Ingen notering'}
+                    <td className="px-2 py-1 text-center" style={{ position: 'relative' }}>
+                      <span
+                        className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
                         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
                         onClick={() => { setNoteModalContent(item.note || ''); setShowNoteModal(true); }}
+                        onMouseEnter={e => {
+                          const tooltip = document.createElement('div');
+                          tooltip.innerText = item.note || 'Ingen notering';
+                          tooltip.style.position = 'fixed';
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          tooltip.style.top = `${rect.top - 40}px`;
+                          tooltip.style.left = `${rect.left + rect.width / 2}px`;
+                          tooltip.style.transform = 'translateX(-50%)';
+                          tooltip.style.background = '#fff';
+                          tooltip.style.color = '#222';
+                          tooltip.style.padding = '6px 12px';
+                          tooltip.style.borderRadius = '6px';
+                          tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                          tooltip.style.zIndex = '9999';
+                          tooltip.className = 'note-tooltip';
+                          document.body.appendChild(tooltip);
+                        }}
+                        onMouseLeave={e => {
+                          const tooltips = document.querySelectorAll('.note-tooltip');
+                          tooltips.forEach(t => t.remove());
+                        }}
                       />
                     </td>
                     <td className="px-2 py-1 text-center">
