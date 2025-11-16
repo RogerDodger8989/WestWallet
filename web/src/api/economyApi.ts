@@ -15,7 +15,7 @@ export async function addEconomyItem(item: { [key: string]: any }): Promise<Econ
 }
 
 export async function updateEconomyItem(item: EconomyItem): Promise<EconomyItem> {
-	 const res = await axios.put(`${API_URL}/${item.id || item._id}`, item);
+	const res = await axios.put(`${API_URL}/${item.id}`, item);
 	return { ...res.data, id: res.data._id, displayId: res.data.displayId };
 }
 

@@ -55,7 +55,23 @@ export class ExpensesService {
   }
 
   async findAll(): Promise<ExpenseDocument[]> {
-    return this.expenseModel.find().exec();
+    const items = await this.expenseModel.find().exec();
+    // Use import for imageConfig
+    // Fallback to defaultPath if localPath is undefined
+    const { imageConfig } = require('../config/image.config');
+    const fs = require('fs');
+    const path = require('path');
+    const basePath = imageConfig.localPath || imageConfig.defaultPath;
+    return items.map((item: any) => {
+      let displayId = item.displayId || item._id?.toString();
+      if (!displayId) return { ...item.toObject(), images: [] };
+      const dir = path.join(basePath, displayId);
+      let images: string[] = [];
+      if (fs.existsSync(dir)) {
+        images = fs.readdirSync(dir).map((f: string) => `/uploads/${displayId}/${f}`);
+      }
+      return { ...item.toObject(), images };
+    });
   }
 
   async findByYear(year: number): Promise<ExpenseDocument[]> {

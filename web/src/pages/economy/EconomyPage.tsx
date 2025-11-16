@@ -383,9 +383,10 @@ const EconomyPage: React.FC = () => {
                     <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
                     <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toFixed(2)} kr</td>
                     <td className="px-2 py-1 text-center">
-                      <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        title={item.images && item.images.length > 0 ? 'Bilder finns' : 'Inga bilder'}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                      <span
+                        className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                        title={item.images && item.images.length > 0 ? `${item.images.length} bild${item.images.length > 1 ? 'er' : ''} bifogad` : 'Inga bilder'}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontWeight: 'bold', fontSize: '0.85rem' }}
                         onClick={async () => {
                           setSelectedItem(item);
                           setShowImageModal(true);
@@ -399,7 +400,11 @@ const EconomyPage: React.FC = () => {
                           }
                           setImageLoading(false);
                         }}
-                      />
+                      >
+                        {item.images && item.images.length > 0 ? (
+                          <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>{item.images.length}</span>
+                        ) : null}
+                      </span>
                           {/* Modal för bildhantering */}
                           {showImageModal && selectedItem && (
                             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -420,6 +425,12 @@ const EconomyPage: React.FC = () => {
                                       const imgs = await getImages(selectedItem.id, 'economy');
                                       setImageList(imgs);
                                       setImageError('');
+                                      // Uppdatera images-arrayen för rätt item i Zustand-store
+                                      useEconomyStore.setState(state => ({
+                                        items: state.items.map(i =>
+                                          i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                        )
+                                      }));
                                     } catch (err: any) {
                                       setImageError('Kunde inte ladda upp bilder');
                                     }
@@ -439,6 +450,12 @@ const EconomyPage: React.FC = () => {
                                         const imgs = await getImages(selectedItem.id, 'economy');
                                         setImageList(imgs);
                                         setImageError('');
+                                        // Uppdatera images-arrayen för rätt item i Zustand-store
+                                        useEconomyStore.setState(state => ({
+                                          items: state.items.map(i =>
+                                            i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                          )
+                                        }));
                                       } catch (err: any) {
                                         setImageError('Kunde inte ladda upp bilder');
                                       }
@@ -470,6 +487,12 @@ const EconomyPage: React.FC = () => {
                                             const imgs = await getImages(selectedItem.id, 'economy');
                                             setImageList(imgs);
                                             setImageError('');
+                                            // Uppdatera images-arrayen för rätt item i Zustand-store
+                                            useEconomyStore.setState(state => ({
+                                              items: state.items.map(i =>
+                                                i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                              )
+                                            }));
                                           } catch (err: any) {
                                             setImageError('Kunde inte ta bort bild');
                                           }
