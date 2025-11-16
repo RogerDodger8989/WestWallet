@@ -3,6 +3,7 @@ import type { EconomyItem } from '../../store/useEconomyStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
 import Toast from '../../components/Toast';
+import UndoToast from '../../components/UndoToast';
 import { useEconomyStore } from '../../store/useEconomyStore';
 import { uploadImage, deleteImage, getImages } from '../../api/imageApi';
 
@@ -218,9 +219,7 @@ const EconomyPage: React.FC = () => {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6 text-blue-700 dark:text-blue-300">Ekonomihantering</h1>
       {/* Formulär med kategori/leverantör-dropdowns och plus-knapp */}
-      {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
-      )}
+      {/* Ingen vanlig toast, endast UndoToast används nu */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow mb-8">
         <h2 className="font-semibold mb-4">Lägg till ny post</h2>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
@@ -549,21 +548,23 @@ const EconomyPage: React.FC = () => {
       )}
       {/* Toast med ångerknapp uppe till höger */}
       {undoData && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 1000 }}>
-          <div className="bg-blue-600 text-white px-4 py-2 rounded shadow flex items-center gap-4">
-            {undoData.type === 'delete' ? 'Post raderad!' : 'Post uppdaterad!'}
-            <button className="bg-white text-blue-600 px-2 py-1 rounded" onClick={async () => {
-              if (undoTimeout) clearTimeout(undoTimeout);
-              setUndoTimeout(null);
-              if (undoData.type === 'delete') {
-                await useEconomyStore.getState().addItem(undoData.item);
-              } else if (undoData.type === 'edit' && undoData.prev) {
-                await useEconomyStore.getState().updateItem(undoData.prev);
-              }
-              setUndoData(null);
-            }}>Ångra</button>
-          </div>
-        </div>
+        <UndoToast
+          type="error"
+          message={undoData.type === 'delete' ? 'Post raderad!' : 'Post uppdaterad!'}
+          seconds={10}
+          onUndo={async () => {
+            if (undoTimeout) clearTimeout(undoTimeout);
+            setUndoTimeout(null);
+            if (undoData.type === 'delete') {
+              await useEconomyStore.getState().addItem(undoData.item);
+            } else if (undoData.type === 'edit' && undoData.prev) {
+              await useEconomyStore.getState().updateItem(undoData.prev);
+            }
+            setUndoData(null);
+          }}
+          onTimeout={() => setUndoData(null)}
+          position="under-topbar"
+        />
       )}
     </div>
       {/* Modal för notering */}
@@ -579,23 +580,7 @@ const EconomyPage: React.FC = () => {
         </div>
       )}
       {/* Toast med ångerknapp uppe till höger */}
-      {undoData && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 1000 }}>
-          <div className="bg-blue-600 text-white px-4 py-2 rounded shadow flex items-center gap-4">
-            {undoData.type === 'delete' ? 'Post raderad!' : 'Post uppdaterad!'}
-            <button className="bg-white text-blue-600 px-2 py-1 rounded" onClick={async () => {
-              if (undoTimeout) clearTimeout(undoTimeout);
-              setUndoTimeout(null);
-              if (undoData.type === 'delete') {
-                await useEconomyStore.getState().addItem(undoData.item);
-              } else if (undoData.type === 'edit' && undoData.prev) {
-                await useEconomyStore.getState().updateItem(undoData.prev);
-              }
-              setUndoData(null);
-            }}>Ångra</button>
-          </div>
-        </div>
-      )}
+      {/* BORTTAGEN: gammal blå undo-toast */}
       {/* Modal för redigering */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
