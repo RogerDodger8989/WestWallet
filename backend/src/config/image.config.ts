@@ -11,8 +11,9 @@ import * as path from 'path';
 
 const defaultDocumentsPath = path.join(__dirname, '../../uploads');
 
-export const imageConfig: ImageConfig = {
+export const imageConfig: ImageConfig & { defaultPath: string } = {
   storage: 'local', // 'local' eller 's3'
   localPath: process.env.IMAGE_UPLOAD_PATH || defaultDocumentsPath, // Sökväg för lokala bilder
-  compress: true // Komprimera bilder vid uppladdning
+  compress: true, // Komprimera bilder vid uppladdning
+  defaultPath: defaultDocumentsPath
 };
