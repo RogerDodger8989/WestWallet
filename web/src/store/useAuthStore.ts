@@ -30,7 +30,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw new Error('Fel e-post eller lösenord');
     }
   },
-  logout: () => set({ user: null }),
   logout: () => {
     set({ user: null });
     localStorage.removeItem('authUser');

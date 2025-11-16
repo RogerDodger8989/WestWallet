@@ -5,5 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3001,
+    proxy: {
+      '/expenses': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });

@@ -1,0 +1,757 @@
+jaWestWallet - Komplett Ekonomihanteringssystem
+🏗️ Projektöversikt
+⚙️ 1. Grundstruktur
+Monorepo med flera delar:
+westwallet/
+├── backend/        # NestJS (TypeScript)
+├── web/            # React + Vite /React Router
+├── scripts/        # Dev-tools, deployment, backup
+└── docs/           # Dokumentation, API-spec, etc.
+
+
+✅ 1. ID-SYSTEM (GLOBALT BESLUT)
+Valt beslut:
+➡️ Alla moduler delar en och samma globala ID-sekvens.
+Format:
+A000001, A000002, A000003 …
+Motivering:
+•	Du vill kunna synka bilder och filer mellan olika flikar → globalt ID krävs.
+•	Export/import blir mycket renare.
+•	Mindre risk för krockar.
+•	Lätt att generera mappstrukturer: /Ekonomi/A000001, /Bil/A000001 osv.
+________________________________________
+✅ 2. BILDLAGRING – BACKEND ELLER KLIENT?
+Valt beslut:
+➡️ Alla bilder, kvitton, PDF:er sparas på backend-servern.
+Struktur på servern:
+/uploads/{ID}/  
+   - ID_Bild1.jpg  
+   - ID_Bild2.png  
+   - ID_Kvitto.pdf
+Motivering:
+•	Du vill kunna skriva ut, exportera och importera data → måste ligga på backend.
+•	Multi-device / multi-user kräver serverlagring.
+•	Lättare backup.
+•	Bilderna måste komprimeras så dem tar mindre plats. PDF har en max gräns i storlek.
+________________________________________
+✅ 3. TRIAL / PRENUMERATION – VAD HÄNDER NÄR DET TAR SLUT?
+Valt beslut:
+➡️ När 30 dagar gått:
+•	Användaren kan fortfarande logga in.
+•	Men får read-only-läge:
+o	Kan inte skapa / ändra / radera poster
+o	Kan inte ladda upp filer
+o	Kan inte exportera
+o	Kan inte synca till kalender
+•	Överallt visas banner:
+“Din provperiod är slut – för att fortsätta krävs betalning.”
+Admin-panel visar:
+•	trial_start
+•	trial_days_left
+•	is_paid
+•	payment_method
+•	payment_history
+________________________________________
+✅ 4. UNDO-FUNKTION – DEFINIERAD MODELL
+Valt beslut: “Mjukt radera” i 10 sekunder.
+Flöde:
+1.	När en post raderas → sätt isDeleted = true med timestamp.
+2.	Posten syns inte i UI.
+3.	Undo-knapp visas i 10 sek.
+4.	Om användaren klickar "Undo" → isDeleted = false.
+5.	Om tiden går ut → backend raderar posten permanent, inkl. bilder.
+Cron-job hanterar “hard delete” var 1 minut.
+Kan man lägga till en papperskorg som har en histrik på tex senaste 50 posterna?
+________________________________________
+✅ 5. IMPORT FRÅN BANK – DEFINIERADE REGLER
+Valt beslut:
+Regler baseras på matchning av text i kolumnen “Beskrivning”. Kan redigeras innan import.
+Regelmodell:
+{
+   match: "SHELL",
+   kategori: "Bil",
+   leverantör: "Shell",
+   typ: "Bränsle",
+   beloppModifier: null,   // för framtiden
+}
+Matchning:
+•	Default: contains-ignorecase
+•	Avancerat (valbart i inställningar): Regex
+Dubbletter:
+En rad importeras inte om:
+•	Belopp matchar
+•	Datum matchar
+•	Beskrivning matchar till 90%
+•	Och samma konto
+________________________________________
+✅ 6. KALENDER-SYNK – EXAKT VILKA FÄLT
+Valt beslut: Endast följande flikar får kalenderhändelser:
+Synkas:
+•	Avtal & Abonnemang → förnyelsedatum
+•	Försäkringar → förnyelsedatum
+•	Garantier → slutdatum
+•	Hushållsunderhåll → nästa utförandedatum
+•	Bilkostnader → serviceintervall
+Inte synkas:
+•	Ekonomihantering (ej relevant)
+Synkmodell:
+➡️ Envägssynk (WestWallet → Google Calendar)
+(Ingen ändring från Google → appen.)
+________________________________________
+✅ 7. EXPORT / IMPORT – SLUTGILTIG MODELL
+Format:
+➡️ ZIP-fil med följande struktur:
+westwallet_export/
+   data.json
+   files/
+      A000001/
+          A000001_Bild1.jpg
+          A000001_Kvitto.pdf
+      A000002/
+          ...
+Export:
+•	Användaren väljer moduler (checkboxar)
+•	Väljer om filer ska inkluderas
+•	Export sker som:
+•	{
+•	   usersettings: {},
+•	   ekonomihantering: [],
+•	   bilkostnader: [],
+•	   avtal: [],
+•	   garantier: []
+•	}
+Import:
+•	Systemet läser ID:t från filen
+•	Om ID finns i databasen:
+➜ skapa nytt ID och remappa all data
+•	Om ID saknas:
+➜ importera direkt
+•	Filer hamnar i rätt ID-mapp automatiskt
+________________________________________
+✅ 8. NOTIFIERINGAR – DEFINIERAD LOGIK
+Körs 1 gång/dag kl 03:00.
+Avtal:
+•	90 / 30 / 10 dagar innan slutdatum
+Garantier:
+•	60 / 30 / 7 dagar innan slut
+Försäkringar:
+•	60 / 30 / 7 dagar innan förnyelse
+Hushållsunderhåll:
+•	När nästa planerat datum närmar sig
+Trial:
+•	3 dagar innan trial slut
+•	1 dag innan
+•	Trial slut → “Provperiod slut”
+Massutskick:
+•	Endast admin kan trigga manuellt
+Inställningar per användare via:
+user.preferences.notifications = {
+   garanti: true,
+   avtal: true,
+   forsakring: true,
+   hushall: true,
+   trial: true
+}
+________________________________________
+✅ 9. VAR SPARAS INSTÄLLNINGAR?
+Valt beslut:
+➡️ Allt sparas centralt i databasen under users.preferences.
+Motivering:
+•	Fungerar på alla enheter
+•	Går att exportera
+•	Admin kan se användarinställningar
+•	Säkrare än localStorage
+UI-ändringar (dark/light mode) får ligga localStorage för snabbhet.
+________________________________________
+🧠 ÖVRIGA DESIGNBESLUT
+A. Logging / Audit Log (infört)
+Schema:
+auditlog: {
+    id,
+    userId,
+    entityType,    // t.ex "ekonomi"
+    entityId,
+    action,        // create, update, delete
+    changes: {},
+    timestamp
+}
+B. Rate limiting för mail (infört)
+•	5 mail/min per IP
+•	5 reset-password per timme
+C. Systemhälsa / Adminpanel (infört)
+Admin kan se:
+•	Mailstatus
+•	Cronstatus
+•	Stripe/Paddle-webhooks
+•	Server uptime
+•	Diskutrymme
+•	Versionsinfo
+
+
+______________________________________________________________________________
+🧱 2. Backend – NestJS (rekommenderat)
+•	Autentisering: bcrypt.
+•	Rollhantering: admin, user.
+•	Databas: Mongoose (MongoDB).
+•	Kryptering: AES med crypto-js innan data lagras.
+•	Mail: SendGrid SDK (för återställning, påminnelser, fakturamail).
+•	Betalning: Stripe (enklast API och bra webhook-stöd).
+________________________________________
+💻 3. Frontend –  Vite som byggmiljö (snabbt, enkelt). React Router för vyväxling (login, register, verify-email, reset-password osv). Samt shadecn
+•	UI-bibliotek: Shadcn/UI + Tailwind (passar ditt designkrav).
+•	State: Zustand eller Redux Toolkit.
+•	Autentisering: JWT-login &  (AuthGuard) tokens i cookies eller localStorage.
+•	Datavisualisering: Recharts (för dashboard/statistik).
+•	Bildhantering: IndexedDB + backend-länk.
+•	Export/utskrift: react-to-print + servergenererade PDF:er (reportlab).	
+•	Ska finnas en knapp ljust/mörkt läge. Denna knapp sva vara till vänster om användarnmanet.
+•	Man ska kunna se sitt användarnamn, när man klickar på det så kommer man till inställningar. Denna ska vara till vänster om logga ut.
+•	Menyerna ska vara vågrätta och utan text. När man för musen över så lyser dem upp och en beskrivning kommer fram.
+•	Där ska vara en logga ut knapp längst upp till höger efter Användarnmanet som är till vänster om logga ut.
+•	Loggan ska vara längst upp till höger mend namnet ”WestWallet” brevid.
+•	Den vågräta menyn ska följa sidan när man skrollar.
+Utöver detta ska den vara:
+•  snabbt
+•  robust
+•  hanterbart
+•  lätt att vidareutveckla
+•  säker
+
+Error handling / UI-feedback
+❌ Global error-hantering
+❌ ”No internet” fallback
+❌ Graceful fail när backend är nere
+❌ Retry-logik
+❌ Loading skeletons / shimmer
+Det här behövs, annars blir appen ”hård och kantig”.
+•	ErrorBoundary komponent
+•	LoadingSkeleton för alla listor
+•	Toast-system (du har det i text, men inte definierat för UI-hantering)
+Rollen: ADMIN UI
+❌ Admin dashboard
+❌ Se användare
+❌ Ändra roller
+❌ Se licenser / provperioder
+❌ Mailutskick
+❌ Systeminställningar
+
+Routingstruktur – 
+•	/login
+•	/register
+•	/verify-email
+•	/reset-password
+•	/dashboard
+•	/settings
+•	/economy
+•	/subscriptions
+•	/cars
+•	/guarantees
+•	/inventory
+•	/insurance
+•	/maintenance
+•	/admin/*
+Komponentstruktur 
+En professionell app skriver man komponentstruktur.
+src/
+  components/
+    ui/ (shadcn)
+    forms/
+    modals/
+    tables/
+    icons/
+    charts/
+  features/
+    auth/
+    economy/
+    subscriptions/
+    cars/
+    ...
+  store/
+  hooks/
+  pages/
+  layouts/
+
+State-modell – SAKNAS
+•	hur många Zustand stores?
+•	hur ska global state se ut?
+•	vilka slices finns?
+Exempel:
+useAuthStore
+useThemeStore
+useEconomyStore
+useImageStore
+useSettingsStore
+useAdminStore
+
+Permissions i frontend 
+Backend har rollersystem: user, admin.
+Frontend måste:
+❌ gömma adminmeny för user
+❌ styra vad som renderas baserat på permissions
+❌ redirecta user från adminroutes
+
+Filuppladdning UI
+"bildhantering: IndexedDB + backend-länk"
+Med:
+•	filstorleksgränser?
+•	progressbar?
+•	preview?
+•	validering?
+•	drag-and-drop?
+•	image crops?
+•	pdf visning?
+
+Filter & sökning 
+frontend behöver:
+•	debounce search
+•	multiple tag filter
+•	date filter UI
+•	reusable filterkomponent
+•	
+Print/Export UI :
+•	var knapparna sitter
+•	hur export UI ser ut
+•	hur rapporter visualiseras
+•	hur användaren väljer datumintervall
+
+Global hotkeys
+•	Ctrl+K = global search
+•	N = skapa ny post
+•	Ctrl+F = fokusera sökfält
+•	H = gå till hem
+🌓 3. Klient-tema storage
+Spara darkmode i localStorage.
+🎛 4. Widget-dashboard
+Användaren kan välja vilka widgets man vill se.
+🔍 5. Global search (Command-Bar)
+Som Spotlight/Alfred/Windows Search—väldigt Apple-aktigt.
+🔒 6. Rate limiting feedback
+Visa toast: "Du trycker för snabbt".
+🎞 7. Page transitions (framer-motion)
+Så appen känns modern.
+
+________________________________________
+🔒 4. Säkerhet och drift
+•	HTTPS via Nginx (reverse proxy).
+•	Miljövariabler i .env.
+•	Automatisk backup av MongoDB (skript i /scripts/backup.sh).
+•	Daglig cronjob via node-cron i backend.
+1. Förfina autentiseringen
+•	E-postverifiering: när någon registrerar sig skickas en länk de måste klicka på innan kontot aktiveras.
+•	Token-refresh: så att användaren inte loggas ut när JWT-token går ut (du ger dem en längre “refresh token”).
+•	Roller / behörigheter: t.ex. admin, user, moderator — skydda vissa endpoints med @Roles('admin').
+
+________________________________________
+☁️ 5. DevOps och hosting
+•	Utveckling: VS
+•	Testmiljö: VS/GitHub
+•	Produktion:
+o	Backend → NestJS (TypeScript)
+o	Databas → MongoDB 
+o	Frontend → React + Vite /React Router
+
+✅ Lösenord & inloggning: Användarens lösenord= 🔒 Hashning (ex: bcrypt)
+✅ Privata fält / känslig data: Anteckningar, ekonomi, bilder= 🔐 Kryptering (ex: AES med crypto-js)
+
+- WestWallet är ett avancerat webbased ekonomihanteringssystem byggt för personlig och hushållsekonomi. Systemet kombinerar traditionell utgifts-/inkomstspårning med avancerade funktioner som abonnemangshantering, bilkostnadsberäkning, bildhantering och omfattande rapportering.
+- Posterna som skapas har ID i en gemensam databas som synkas mellan sidorna. Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen: Ladda upp bild, Radera alla bilder. Man ska även se alla när man trycker på bild ikonen som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+- Alla knappar ska ha samma gråa standard stil på alla sidor.
+- Knappen Tema mörkt/ljust skulle jag vilja ha längst ner i det vänstra hörnet som en cool sol/måne och en snygg animation när man har mouse over och klickar. Se bild på ex. 
+- Bilder sparas på en plats som man väljer i inställningar. Raderar man en bild, raderas den från den platsen.
+- På ALLA sidor kommer det upp en sk. toast som frågar om man vill radera en post när man trycker på radera. när man tryckt på radera så ska det i vänstra övre hörnet finns en undo knapp i 10 sekunder. Den tidsintervallen ska du kunna ända i inställningar.
+- När man skapar/redigererar eller raderar en post så ska det komma en popup längst ner i mitten som visar vad som hänt.
+- På alla sidor där man ska välja ett datum ska man göra det på detta sätt: En  klickbar och tangentbordsnavigering för type="month" input-fält, som öppnar den inbyggda månadsväljaren i webbläsaren.
+- Ikon uppe i fliken samt implantera logo. När man trycker på loggan uppe till vänster så ska man komma till ”Om & kontakt”. Loggan är bifogad. Den ska passa in ovanför menyn.
+- Varje sida så ska det stå flikens rubrik. Tex: Ekonomihantering, Avtal  & dokument m.m.
+- Utskrifer på ALLA sidor ska komma upp som en vanlig utskriftsdialog så man kan välja att skriva ut eller spara som PDF.
+OBS! Alla sidor SKA HA EXAKT samma databasstruktur och relationslogik som "Ekonomihantering", INGET ANNAT!!
+
+
+Har du förlslag eller frågor så ta dem INNAN du skapar koden, tack!
+Ta INTE bort funktioner utan att fråga, tack!
+Skapa de filer som behövs för detta projekt.
+
+Menyer
+💰 Ekonomihantering:
+- Utgifts-/Inkomstspårning med kategorisering
+- Månad/År/Typsvis filtrering som visaar aktuel månad som standard
+- När man lägger till post ska man kunna välja en eller flera månader den ska gälla. Aktuell månad ska vara förvald som standard.
+- Rutor att fylla i ska vara "Namn", "Belopp (kr)", Valbar Dropdown med antingen "inkomster" eller "utgifter", Dropdown "Kategori" med en knapp som är ett plus där man kan addera, Dropdown "Leverantör" som är knuten till den kategori man valt med en knapp som är ett plus där man kan addera, Notering. Sen en knapp som heter lägg till, som lägger till posten i en lista nedan..
+- Om man redigerar en post så flyttas datan upp igen till där man skapar posten och knappen "lägg till" ändras till "Updatera post" med en knapp brevid "Avbryt redigering"
+- Summeringar med inkomst/utgift-uppdelning
+- Sökfunktion i alla transaktioner
+- Negativa tal ska vara med ett "-" före samt i röd färg och två decimaler. Inkomst ska vara grön text med 2 decimaler.
+- Varje post som skapas ska ha ett ID nr som är unik och synkas mellan alla andra sidor. Tex på ID är A000001.
+Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen: Ladda upp bild, Radera alla bilder. Man ska även se alla bilder som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+Posterna ska synas i kolumner med följande rubriker: "Månad" som visas som ÅÅÅÅ-MM, "ID","Namn", "Typ", "Kategori", "Leverantör", "Belopp", "Notering". Längst till höger ska det finnas en redigeringsknapp och papperskorg för att radera post. 
+- På alla sidor där man ska välja ett datum ska man göra det på detta sätt: En  klickbar och tangentbordsnavigering för type="month" input-fält, som öppnar den inbyggda månadsväljaren i webbläsaren.
+- importera från banken xlsx eller cvs filerna
+	: skapa regler utifrån kolumnen "Beskrivning"
+	: Inte importera dubletter
+📅 Avtal & abonnemang:
+- Automatisk postergenerering baserat på betalningsfrekvens
+- Flexibla intervaller: Månadsvis, kvartalsvis, halvårsvis, årligen
+- Smart datumberäkning för nästa betalning
+- Synkning mellan abonnemang och genererade poster i Ekonomihantering samt Foton m.m.
+- Bulk-hantering av återkommande kostnader
+- Precis som i ”Ekonomihantering” så ska man kunna lägga till följande när man skapar en ny post: Namn, Kategori som då bara visar kopplade Leverantörer, ”Står på (ägare)”, ”Start (månad)”, ”Slut (månad)”, ”Eller antal månader” som ersätter ”Slut (månad)” eller tvärtom, ”Kostnad / månad (SEK)”, ”Betalningsfrekvens” som nämnt ovan, ”Anteckningar”, Sen en knapp som heter lägg till, som lägger till posten i en lista nedan. 
+Dropdown "Kategori" med en knapp som är ett plus där man kan addera, Dropdown "Leverantör" som är knuten till den kategori man valt med en knapp som är ett plus där man kan addera.
+- Om man redigerar en post så flyttas datan upp igen till där man skapar posten och knappen "lägg till" ändras till "Updatera post" med en knapp brevid "Avbryt redigering". Inaktiverad innebär att framtida betalningar ska försvinna.
+- Negativa tal ska vara med ett "-" före samt i röd färg och två decimaler. Inkomst ska vara grön text med 2 decimaler.
+- Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen: Ladda upp bild, Radera alla bilder. Man ska även se alla bilder som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+
+- Varje post som skapas ska ha ett ID nr som är unik och synkas mellan alla andra sidor. Tex på ID är A000001.
+- Posterna ska synas i kolumner med följande rubriker: "Start" som visas som ÅÅÅÅ-MM (Som bekrivet ovan, för type="month" input-fält), "Slut" som visas som ÅÅÅÅ-MM (Som bekrivet ovan, för type="month" input-fält) , "ID","Namn",  ”Frekvens”, "Kategori", "Leverantör", ”Ägare”, "Månad", "Notering". Längst till höger ska det finnas en redigeringsknapp, Inaktivera och papperskorg för att radera post. 
+- Sök och filter: t.ex. “alla avtal som går ut i år”.
+- Push-påminnelse när avtal snart löper ut eller behöver förnyas.
+- Total månadskostnad / årsutgift för alla avtal.
+- Dashboard med statistik (antal aktiva, kommande uppsägningar, total kostnad).
+- Kategorier: el, mobil, internet, försäkring, hyra, leasing, jobb, privat.
+- Status: aktiv, avslutad, undertecknad, väntar på motpart.
+- Notiser för viktiga händelser: “Ditt mobilavtal löper ut om 10 dagar.”
+
+🚗 Bilkostnader:
+-	Precis som ”Avtal & abonnemang” & ”Ekonomihantering” ska man kunna skapa poster. Denna information ska man kunna lägga till under rubriken ”Skapa bil”:
+o	”Skapa/Välj bil” (Med en ”+” -ikon för att lägga till med Dropdown, ”Penna-ikon” för att redigera, Papperskorg-ikon för att radera bil samt bilens poster.
+o	Namn på bilen
+o	Regnr
+o	Arkivera (såld) kryssruta med datumväljare precis under.
+-	Lägg till händelser rubrik med dessa rutor (I rutorna kan det vara exempel):
+o	Bil (dropdown där man väljer bil)
+o	Datum-kalender
+o	Typ (Vilken typ av reperation) med ett ”+” brevid så man kan lägga till, samt en ikon för papperskorg om man vill ta bort. Är en post sparad på en Typ som raderas ska den ändras till ”Övrigt”. Övrigt går inte att radera.
+o	”Av vem” med ett ”+” brevid så man kan lägga till, samt en ikon för papperskorg om man vill ta bort. Är en post sparad på en Typ som raderas ska den ändras till ”Övrigt”. Övrigt går inte att radera.
+o	Miltal
+o	Summa
+o	Noteringar
+o	Knapp ”Spara händelse”, samt knapp ”Rensa”
+-	Specialiserad bilhantering med egen kostnadskategorisering
+-	Kilometerkostnadsberäkning (kr/mil). Ska kunna få staitstik på detta.
+-	Bränslekonsumtionsanalys
+-	Servicekostnadsöversikt per bil/alla bilar samt sammanlagt år/månad. Valbart
+-	Försäkrings- och avgiftshantering
+-	Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen med en: Ladda upp bild, Radera alla bilder. Man ska även se alla bilder som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+-	”Sök & filter”-rubrik där man kan filtrera post listan nedanför:
+o	Kryssruta för att visa eller gömma arkiverade bilar.
+o	Bil (Välja en bil, eller alla bilar)
+o	År
+o	Typ
+o	Av vem
+o	Fri söktext
+o	Skriv ut
+-	Under det ovan så ska posterna visas i kolumner i denna ordning:
+- ID, Bil, Datum, Vad, Av, Summa, Notering, Knapp ”Redigera” som då tar dig till där du skapar händelse och knappen ”lägg till” ändras till ”Updatera post”, Sen en knapp som heter ”Ta bort” som tar bort den posten från alla sidor.
+- Negativa tal ska vara med ett "-" före samt i röd färg och två decimaler. Inkomst ska vara grön text med 2 decimaler.
+- Varje post som skapas ska ha ett ID nr som är unik och synkas mellan alla andra sidor. Tex på ID är A000001.
+
+Garantier:
+- På ALLA sidor kommer det upp en sk. toast som frågar om man vill radera en post när man trycker på radera. när man tryckt på radera så ska det i vänstra övre hörnet finns en undo knapp i 10 sekunder. Den tidsintervallen ska du kunna ända i inställningar.
+- När man skapar/redigererar eller raderar en post så ska det komma en popup längst ner i mitten som visar vad som hänt.
+- På alla sidor där man ska välja ett datum ska man göra det på detta sätt: En  klickbar och tangentbordsnavigering för type="month" input-fält, som öppnar den inbyggda månadsväljaren i webbläsaren.
+-	Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen: Ladda upp bild, Radera alla bilder. Man ska även se alla bilder som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+-	”Sök & filter”-rubrik där man kan filtrera post listan nedanför, samt skriva ut rapporter:
+-	Varje post som skapas ska ha ett ID nr som är unik och synkas mellan alla andra sidor. Tex på ID är A000001.
+-	Färgkodning: grön (aktiv), gul (snart utgår), röd (utgången).
+-	Push- eller mejlpåminnelse t.ex. 30 dagar innan garantin går ut.
+-	Möjlighet att snooza eller markera som “förlängd”.
+-	Statistikvy – se hur mycket du köpt senaste året, eller vilka butiker du handlar mest i.
+Generera statistikrapporter som PDF (“Inventarie 2025-Q4”).
+📄 Grunduppgifter:
+-	Artikel / produktnamn
+-	Köpt av (leverantör) – koppling till leverantörstabellen, dropdown
+-	Köpedatum 
+-	Garantiperiod (t.ex. 2 år)
+-	Garantins utgångsdatum (kan räknas automatiskt från köpedatum + period)
+-	Typ av garanti – tillverkargaranti, säljargaranti, serviceavtal, etc.
+
+🔍 Detaljer / bevis
+-	Kvitto / faktura – länk eller uppladdad bild/pdf (Sparas på ID som övriga flikar gör OCH synkas)
+-	Garantibevis – fil eller bild (Sparas på ID som övriga flikar gör OCH synkas)
+-	Serienummer / produkt-ID
+-	Beskrivning / anteckningar – t.ex. “Byte av motor gäller t.o.m. 2026-09-12”
+
+⚙️ Status och uppföljning
+-	Status – giltig, utgången, reklamerad, pågående ärende
+-	Påminnelse – t.ex. notifiering 30 dagar innan garanti löper ut
+-	Kontakt för reklamation – e-post, telefon eller länk till supportsida
+
+🧠 Extra för smidighet
+-	Kategori (t.ex. “Elektronik”, “Maskiner”, “Möbler”), dropdown
+-	Kopplad utgift / inköp (så man ser vad garantin hör till)
+-	Kommentarer / historik – noteringar om service, byten, etc.Inventarier:
+-	Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen: Ladda upp bild, Radera alla bilder. Man ska även se alla bilder som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+Försäkringar:
+📄 Grunduppgifter
+-	Försäkringens namn / typ (t.ex. “Företagsförsäkring”, “Bilförsäkring”, “Elektronikförsäkring”)
+-	Försäkringsbolag (koppling till leverantör eller eget fält)
+-	Försäkringsnummer / avtal-ID
+-	Startdatum
+-	Slutdatum / förnyelsedatum
+-	Premiebelopp (månad/år)
+-	Betalningsintervall (månad, kvartal, år)
+-	Vilket företag - koppling till leverantörstabellen, dropdown
+🧾 Täckning och villkor
+-	Vad som täcks (kort beskrivning eller kategori)
+-	Självrisk
+-	Maxbelopp / ersättningsnivå
+-	Villkorsfil / pdf (uppladdad fil från bolaget)
+-	Undantag / särskilda villkor (t.ex. “Gäller ej vid oaktsamhet”)
+📞 Kontakt och administration
+-	Kontaktperson / supportnummer
+-	E-post eller länk till skadeanmälan
+-	Hemsida
+-	Bankgiro / autogiroinformation (om du betalar manuellt)
+🔔 Påminnelser och status
+-	Status – aktiv, avslutad, väntar på förnyelse
+-	Påminnelse om förnyelse – t.ex. 30 dagar innan slutdatum
+-	Senaste premiebetalning (datum)
+📊 Extra (för analys)
+-	Kategori – t.ex. “Fordon”, “Fastighet”, “Personalförsäkring”
+-	Totala årskostnader – kan räknas automatiskt
+Hushållsunderhåll:
+- På ALLA sidor kommer det upp en sk. toast som frågar om man vill radera en post när man trycker på radera. när man tryckt på radera så ska det i vänstra övre hörnet finns en undo knapp i 10 sekunder. Den tidsintervallen ska du kunna ända i inställningar.
+- När man skapar/redigererar eller raderar en post så ska det komma en popup längst ner i mitten som visar vad som hänt.
+- På alla sidor där man ska välja ett datum ska man göra det på detta sätt: En  klickbar och tangentbordsnavigering för type="month" input-fält, som öppnar den inbyggda månadsväljaren i webbläsaren.
+-	Brevid ID där alla posterna visas samlade, där ska det vara en ikon som är grön när där finns bilder kopplade. Röd om där inte är något. När man trycker på den ikonen: Ladda upp bild, Radera alla bilder. Man ska även se alla bilder som ”ID-Bild 1” Bilderna ska sedan kunna hittas i fliken 
+-	”Sök & filter”-rubrik där man kan filtrera post listan nedanför, samt skriva ut rapporter:
+-	Varje post som skapas ska ha ett ID nr som är unik och synkas mellan alla andra sidor. Tex på ID är A000001.
+🏠 Grunddata
+-	Titel / åtgärd – “Måla fasad”, “Service värmepump”, “Rensa takrännor”
+-	Leverantör -  - koppling till leverantörstabellen, dropdown
+-	Kategori – el, VVS, trädgård, bygg, ventilation, etc. - koppling till kategoritabellen, dropdown
+-	Plats / objekt – t.ex. “Garage”, “Kök”, “Lägenhet”
+-	Prioritet – låg, normal, hög
+📅 Tider och cykler
+-	Utförandedatum / planerat datum
+-	Nästa datum / intervall (t.ex. varje år, var 5:e år)
+-	Påminnelse (x dagar innan planerat datum)
+-	Senast utfört av (leverantör, person, firma)
+💰 Kostnader
+-	Kostnad (för senaste tillfället)
+-	Budget / uppskattad kostnad nästa gång
+-	Kopplad utgift (länk till fakturan/bild/pdf om du redan har den registrerad)
+📎 Dokumentation
+-	Kvitto / faktura / som bild eller PDF serviceprotokoll
+-	Anteckningar – t.ex. “Bytt filter, ska göras igen våren 2026”
+-	Bilder/pdf före/efter (användbart för fastigheter)
+
+📊 Extra (för långsiktig koll)
+-	Livslängd på utrustning (t.ex. “Värmepump: 15 år”)
+-	Status – planerat, pågående, klart
+-	Totala kostnader per år / kategori
+
+📊 Rapportering & Analys:
+- På alla sidor där man ska välja ett datum ska man göra det på detta sätt: En  klickbar och tangentbordsnavigering för type="month" input-fält, som öppnar den inbyggda månadsväljaren i webbläsaren.
+📊 Ekonomisk översikt
+-	Syfte: snabbt se läget på en månad, ett år eller totalt.
+-	Sammanfattning per månad / år
+-	Totala utgifter, inkomster och saldo
+-	Utveckling över tid (linjediagram)
+-	Bästa / sämsta månader
+-	Kategorifördelning
+-	Cirkeldiagram: t.ex. “Boende 32%, Bil 18%, Försäkringar 10%”
+-	Filtrering per hushållsmedlem, kategori eller leverantör
+-	Trendlinje över sparande / kassaflöde
+-	Top 10 leverantörer efter kostnad
+-	Månadens största utgift
+-	Jämförelse mot föregående period
+
+🔍 Detaljerad analys
+-	Syfte: gräva djupare och se samband.
+-	Utgifter per leverantör / kategori över tid
+-	Stapeldiagram eller heatmap (“vilka månader går elen upp?”)
+-	Återkommande utgifter
+-	Identifiera abonnemang, service, försäkringar, etc.
+-	Garantier och försäkringar som löper ut snart
+-	Underhållskostnader per fastighet / objekt
+-	Försäkringskostnader vs utfall (t.ex. antal skador / ersättningar)
+-	Avtal per leverantör – totalkostnad och bindningstider
+-	Bilägande: bränsle, service, skatt, försäkring → totalkostnad/år
+-	Energi / driftkostnader – jämförelse mellan år (för hushåll eller företag)
+-	Prognos – enkel trendlinje som gissar kommande månader baserat på historik
+🧾 Utskrifter & Export
+-	Syfte: göra data användbar utanför appen.
+-	Export till Excel / CSV / PDF
+-	Per kategori, leverantör, tidsperiod
+-	Sammanställning för bokföring eller deklaration
+-	Utskrift av rapporter
+	“Årsrapport 2025”
+	“Utgifter per leverantör Q3”
+	“Garantiöversikt med utgångsdatum nästa 6 mån”
+-	Generera grafer i PDF med datumintervall
+-	Export av bilder / kvitton kopplade till utgifter
+-	Automatiska rapporter via e-post (t.ex. månadsvis PDF)
+
+🧠 Smarta analyser (om du vill gå längre)
+-	Kostnadsprognos med AI (“nästa månad väntas öka pga elpriser”)
+-	Anomalidetektering – flagga ovanligt höga utgifter
+-	Automatisk kategorisering av nya utgifter
+-	“Hälsopoäng” för ekonomin – visualisera hur balanserat hushållet spenderar
+-	Koldioxidspårning (om du vill göra något grönt: uppskatta miljöpåverkan av inköp)
+🧩 Tekniska bonusidéer
+-	Dashboard-läge med widgets (valbara grafer / tabeller)
+-	Filter + datumväljare i toppen för alla rapporter
+-	“Favoritrapporter” – spara egna urval (t.ex. “Elkostnader senaste 12 mån”)
+-	Integrationer: exportera till Google Sheets, Fortnox, Excel Online
+-	Snapshots – ta “ekonomibild” per år (för att kunna jämföra 2024 mot 2025)
+Bankrapport
+🧾 Rubrik & sammanfattning
+-	Titel: “Ekonomisk rapport – [namn eller hushåll]”
+-	Period: t.ex. 1 januari – 31 december 2025
+-	Datum för rapporten
+-	Syfte: “Underlag till bank i samband med låneförhandling / kreditbedömning”
+-	Kontaktuppgifter: namn, adress, e-post, telefon
+💰 Inkomster
+-	Totala inkomster per månad och år
+-	Fördelning per inkomstkälla
+-	Lön(er)
+-	Bidrag / pension / annan inkomst
+-	Passiva inkomster (uthyrning, ränta, etc.)
+-	Utveckling över tid – diagram (t.ex. 12-månaders snitt)
+📉 Utgifter
+-	Totala utgifter per månad / år
+-	Fördelning per kategori – boende, bil, försäkring, hushåll, underhåll, etc.
+-	Största fasta kostnader – el, försäkringar, lån, abonnemang
+-	Genomsnittlig månadskostnad
+-	Eventuella kostnadsminskningar över tid (positiv trend att visa banken)
+🏡 Tillgångar
+-	Bostadsvärde / marknadsvärde
+-	Bankkonton och sparande
+-	Fonder, aktier, pensionssparande
+-	Fordon / utrustning av värde
+-	Totalt tillgångsvärde
+💳 Skulder & åtaganden
+-	Lån (bolån, billån, privatlån, kreditkortsskulder)
+-	Nuvarande saldo
+-	Ränta och återbetalningstid
+-	Åtaganden / abonnemang (mobil, el, försäkringar, etc.)
+-	Totalt skuldvärde
+-	Belåningsgrad (skuld ÷ tillgångar, i %)
+
+📊 Nyckeltal / sammanfattning
+-	Disponibel inkomst = inkomster − fasta utgifter
+-	Spargrad = sparande ÷ inkomst
+-	Belåningsgrad (%)
+-	Skuldkvot = totala skulder ÷ årsinkomst
+-	Likviditet (hur många månaders utgifter du kan täcka med sparande)
+-	Trendgrafer (inkomst–utgift över tid)
+📅 Framtida åtaganden & planerat underhåll
+-	Kommande renoveringar / investeringar
+-	Försäkringar / avtal som löper ut eller omförhandlas
+-	Planerade underhållsåtgärder (t.ex. takbyte, bilbyte)
+📎 Bilagor / bevis
+-	Kvitton / underlag för större kostnader
+-	Senaste deklaration / lönespecifikation (om du vill kunna bifoga)
+-	Bilder på bostad / fastighet (valfritt)
+-	Utdrag från försäkrings- och garantiöversikt
+🧠 Bonus: Automatiska fält (om du bygger in det)
+-	PDF-export med sammanställd logotyp och datumstämpel
+-	Automatisk inräkning av hushållets totalvärde
+-	Sammanfattande meningar, t.ex.:
+	“Hushållets totala utgifter har minskat med 12 % sedan föregående år.”
+	“Disponibel inkomst per månad: 24 300 kr.”
+Leverantörer & kategorier:
+- Man ska kunna skapa ”Kategori" med en knapp och se en lista där man kan redigera samt radera.
+Man ska kunna skapa "Leverantör" som är knuten till den kategori man valt med en knapp och se en lista där man kan redigera samt radera. 
+- Om man vill redigera en leverantör så ska denne återgå i skapa så man kan redigera Leverantören på detaljnivå med följande:
+-	Namn (företagsnamn eller personens namn)
+-	Organisationsnummer / personnummer
+-	Adress (gatuadress, postnummer, ort, land)
+-	E-postadress (comma sepererad om det är flera)
+-	Kontorets telefonnummer
+-	Bankgiro / plusgiro / IBAN / SWIFT (betalningsuppgifter)
+-	Kontaktperson (namn + telefon)
+-	Anteckningar ’
+
+-	Man ska kunna skriva ut leverantörer i en snygg pdf
+📷 Foton:
+Centraliserad bildhantering (simpleImages.js)
+Smart synkning mellan relaterade poster
+IndexedDB-lagring för optimerad prestanda
+Inställningar:
+- Standardplats för bilder/dokument: välj basmapp → auto-skapa undermappar per meny: Utgifter, Abonnemang, Bil, Garantier, Inventarier, Försäkringar, Hushållsunderhåll m.m. Filnamnsformat:{ID}_{datum}_{kategori}_{titel}
+- På alla sidor kommer det upp en sk. toast som frågar om man vill radera en post när man trycker på radera. när man tryckt på radera så ska det i vänstra övre hörnet finns en undo knapp i 10 sekunder. Den tidsintervallen ska du kunna ända i inställningar.
+- Man ska även kunna exportera samt importera appen själv. Man ska kunna välja vilken av menyerna man vill exportera i form av kryssrutor, även alla. Man ska kunna välja om man vill exportera kvitton/bilder/pdf eller inte också. Vid import så känner den av vilken data som importeras från appen, vilken flik det tillhör.
+- Man ska kunna skriva in sitt: Namn, Adress, stad, postnr, mail samt telefonnr som ska stå med i rapporter som man skriver ut från fliken ”Rapportering & Analys”
+- Synk till Google Calendar. Välja VILKEN av menyerna som ska syncas.
+- Påminnelseprofiler:
+	- Garantier: 60/30/7 dagar före (standard 30 + 7).
+	- Avtal/Abonnemang: 90/30/10 dagar före (standard 30 + 10).
+	- Försäkringar: 60/30/7 dagar före (standard 30 + 7).
+- Backup & versioner
+	- Automatisk backup: daglig/veckovis (standard veckovis), sparas som ”WestWallet_Backup_ÅÅÅÅMMDD-HHMMSS”
+- Versionshistorik på poster och dokument.
+- Man ska kunna radera ALLT, me få en förfrågan om man vill göra backup först.
+Om & kontakt:
+- En beskrivning av programmet samt menyerna vad dem gör och edss funktioner. Vem som gjort sidan och att fel kan förekomma. Här ska också finnas kontaktuppgifter till utvecklaren (mig)
+
+Saker som tilkommit som jag vill ha!!!!!
+1.	Lägg till en skyddad admin-sida där du kan hantera användare.
+2.	Lägg till en “Glömt lösenord?”-knapp vid login som skickar återställningsmail.
+3.	Endast admins kan hantera användare, och endpointen är skyddad med auth.
+4.	SMTP/mail-server, SendGrid och är enkelt att integrera med Node.js/NestJS.
+5.	Jag rekommenderar SendGrid för enkel integration och bra dokumentation.
+6.	Kryptering av data:
+o	All känslig data (t.ex. lösenord) är redan hashad med bcrypt.
+o	För att kryptera övrig privat data (t.ex. anteckningar, transaktioner) kan vi använda AES-kryptering i backend innan lagring i databasen.
+o	Endast backend har nyckeln, och data dekrypteras vid behov.
+7.	- Fri använding 30-dagar sen ska appen kosta. Ska finnas inställnigar man kan göra på detta. och att admin kan se detaljer.
+8.	Inställningar för användarhantering och “glömt lösenord”:
+9.	- Mail massutskick till användare. Tex ska där skickas ett automatiskt efter 30 dagar efrter kund skapat konto. Skciak mail till kunder och/eller grattis kunder.
+⚙️ 1. Inställningar – användarflik
+Låt den ligga i samma struktur som övriga sidor.
+Exempel på innehåll:
+•	Profil (namn, e-post, lösenordsbyte)
+•	Mailinställningar (påminnelser, notiser)
+•	“Hantera prenumeration” (går till betalning eller visar återstående testdagar)
+Backend:
+•	Tabell users
+•	Fält som preferences, trial_start, is_paid, role
+________________________________________
+🛠️ User/Adminpanel
+Endast tillgänglig för användare med role: "admin".
+Vanligt upplägg:
+•	👥 Hantera användare (aktivera, stäng av, ändra roll)
+•	📦 Hantera prenumerationer
+•	🧾 Se betalhistorik
+•	🧰 Systeminställningar (t.ex. ändra priser, testlängd, versionsinfo)
+Backend:
+•	Middleware isAdmin som kollar req.user.role === "admin"
+•	Egen route under /admin/*
+•	Dashboard i frontend med tabeller (React + Recharts + modaler)
+________________________________________
+💳 3. Licens och betalflöde
+Eftersom du redan har mailservern klar har du en stark bas för verifiering.
+Så här kan du lägga upp det:
+🔹 Steg 1: Gratisperiod
+När någon registrerar sig:
+•	trial_start = dagens datum
+•	is_paid = false
+Varje gång de loggar in:
+•	Backend kollar om trial_start + 30 dagar < idag
+o	Om ja → sätt is_trial_expired = true
+Frontend visar t.ex. banner:
+“Din provperiod är slut — fortsätt med WestWallet för 19 kr/månad.”
+________________________________________
+🔹 Steg 2: Betalning
+Smidigast att integrera:
+Paypal?
+•	Stripe (enkelt, säkert, har prenumerationer)
+•	Paddle (bra för EU/Klarna)
+•	LemonSqueezy (snyggare UI, enklare setup)
+Alla dessa kan:
+•	skapa kund, lagra customer_id i din databas
+•	skicka webhook till backend när betalning sker eller avslutas
+•	uppdatera user.is_paid = true
+________________________________________
+🔹 Steg 3: Mailautomation
+Eftersom du har mailservern kan du använda den till:
+•	Välkomstmail (“Tack för att du testar WestWallet!”)
+•	3 dagar innan trial slut → “Din gratisperiod går ut snart”
+•	Efter utgång → “Vill du fortsätta? Klicka här för att aktivera din licens.”
+________________________________________
+🔐 Tips för säkerhet
+•	JWT tokens för autentisering (har jag redan kanske?).
+•	Rollbaserad åtkomst (role: "admin" | "user") i backend.
+•	Middleware för att neka obetalda/trial-expirerade användare.
+

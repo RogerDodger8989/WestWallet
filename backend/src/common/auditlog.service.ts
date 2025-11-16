@@ -11,14 +11,16 @@ export class AuditLogService {
     changes?: any;
     ip?: string;
   }) {
-    await AuditLog.create({
-      userId,
-      action,
-      model,
-      documentId,
-      changes,
-      ip,
-    });
+    // Auditloggning tillfälligt avstängd pga MongoDB-problem
+    return;
+    // await AuditLog.create({
+    //   userId,
+    //   action,
+    //   model,
+    //   documentId,
+    //   changes,
+    //   ip,
+    // });
   }
 
   async findLogs({ userId, action, from, to, limit = 100, skip = 0 }: {

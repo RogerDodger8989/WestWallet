@@ -8,14 +8,17 @@ export class Expense {
   @Prop({ required: true })
   name: string;
 
-    @Prop({ required: false, index: true })
-    organizationId?: string;
+  @Prop({ required: false, index: true })
+  organizationId?: string;
 
   @Prop({ required: true })
   amount: number;
 
   @Prop({ required: true })
   type: string;
+
+  @Prop({ required: true, unique: true })
+  displayId: string;
 
   @Prop({ required: true })
   year: number;
@@ -34,3 +37,5 @@ export class Expense {
 }
 
 export const ExpenseSchema = SchemaFactory.createForClass(Expense);
+
+

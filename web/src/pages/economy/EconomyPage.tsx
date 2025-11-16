@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
 import Toast from '../../components/Toast';
@@ -29,6 +29,7 @@ const EconomyPage: React.FC = () => {
   };
   const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
   const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
+  const { items, addItem, fetchItems } = useEconomyStore();
 
   // Visa alla leverantörer, men dropdown är disabled tills kategori är vald
   const allSuppliers = suppliers;
@@ -39,12 +40,17 @@ const EconomyPage: React.FC = () => {
     fetchSuppliers();
   }, []);
 
+  // Hämta poster vid sidladdning
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
   // Auto-select supplier when suppliers change
   React.useEffect(() => {
     if (suppliers.length > 0) {
-      if (!selectedSupplier || !suppliers.find(sup => sup._id === selectedSupplier || sup.id === selectedSupplier)) {
-        setSelectedSupplier(suppliers[0]._id || suppliers[0].id);
-        console.log('Auto-set selectedSupplier to', suppliers[0]._id || suppliers[0].id);
+      if (!selectedSupplier || !suppliers.find(sup => sup.id === selectedSupplier)) {
+        setSelectedSupplier(suppliers[0].id);
+        console.log('Auto-set selectedSupplier to', suppliers[0].id);
       }
     } else {
       setSelectedSupplier('');
@@ -60,7 +66,6 @@ const EconomyPage: React.FC = () => {
       setToast({ message: error, type: 'error' });
     }
   }, [error]);
-  const { items, addItem } = useEconomyStore();
 
   // Filtrera leverantörer baserat på vald kategori
   // (Redundant declaration removed, only one filteredSuppliers remains at the top)
@@ -68,13 +73,9 @@ const EconomyPage: React.FC = () => {
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName.trim()) {
-      const response = await addCategory(newCategoryName.trim());
-      // Sätt alltid till _id från backend-svaret
-      if (response && response._id) {
-        setSelectedCategory(response._id);
-        fetchSuppliers(response._id);
-        setSelectedSupplier('');
-      }
+      await addCategory(newCategoryName.trim());
+      fetchSuppliers();
+      setSelectedSupplier('');
       setToast({ message: 'Kategori skapad!', type: 'success' });
       setShowCategoryModal(false);
       setNewCategoryName('');
@@ -84,15 +85,30 @@ const EconomyPage: React.FC = () => {
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newSupplierName.trim()) {
-      const response = await addSupplier(newSupplierName.trim());
-      if (response && response._id) {
-        setSelectedSupplier(response._id);
-        fetchSuppliers();
-      }
+      await addSupplier(newSupplierName.trim());
       setToast({ message: 'Leverantör skapad!', type: 'success' });
       setShowSupplierModal(false);
       setNewSupplierName('');
     }
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Månad som YYYY-MM
+    const monthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    await addItem({
+      name,
+      amount: Number(amount),
+      type: type as 'income' | 'expense',
+      category: selectedCategory,
+      supplier: selectedSupplier,
+      note,
+      month: monthStr,
+    });
+    setToast({ message: 'Post sparad!', type: 'success' });
+    setName('');
+    setAmount('');
+    setNote('');
   };
 
   return (
@@ -110,11 +126,15 @@ const EconomyPage: React.FC = () => {
             setToast({ message: 'Fyll i alla fält!', type: 'error' });
             return;
           }
+          // month är YYYY-MM, dela upp till year och month (number)
+          const [yearStr, monthStr] = month.split('-');
+          const year = parseInt(yearStr, 10);
+          const monthNum = parseInt(monthStr, 10);
           await addItem({
             name,
             amount: parseFloat(amount),
-            type,
-            month,
+            type: type as 'income' | 'expense',
+            month: monthStr,
             category: selectedCategory,
             supplier: selectedSupplier,
             note,
@@ -140,13 +160,13 @@ const EconomyPage: React.FC = () => {
               value={selectedCategory}
               onChange={e => {
                 setSelectedCategory(e.target.value);
-                fetchSuppliers(e.target.value);
+                fetchSuppliers();
                 // selectedSupplier sätts automatiskt via useEffect
               }}
             >
               <option value="">Välj kategori</option>
               {categories.map(cat => (
-                <option key={cat._id || cat.id || cat.name} value={cat._id || cat.id}>{cat.name}</option>
+                <option key={cat.id || cat.name} value={cat.id}>{cat.name}</option>
               ))}
             </select>
             <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowCategoryModal(true)}>+</button>
@@ -161,7 +181,7 @@ const EconomyPage: React.FC = () => {
             >
               <option value="">Välj leverantör</option>
               {suppliers.map(sup => (
-                <option key={sup._id || sup.id || sup.name} value={sup._id || sup.id}>{sup.name}</option>
+                <option key={sup.id || sup.name} value={sup.id}>{sup.name}</option>
               ))}
             </select>
             <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(true)} disabled={!selectedCategory}>+</button>
@@ -245,16 +265,34 @@ const EconomyPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.map(item => (
-                  <tr key={item.id} className="border-b">
-                    <td className="px-2 py-1">{item.month}</td>
-                    <td className="px-2 py-1">{item.id}</td>
-                    <td className="px-2 py-1">{item.name}</td>
-                    <td className="px-2 py-1">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
-                    <td className="px-2 py-1">{item.category}</td>
-                    <td className="px-2 py-1">{item.supplier}</td>
-                    <td className="px-2 py-1">{item.amount.toFixed(2)} kr</td>
-                    <td className="px-2 py-1">{item.note}</td>
+                {items.map((item, index) => (
+                  <tr key={(item.id || '') + '-' + index} className="border-b text-center">
+                    <td className="px-2 py-1 text-center">{item.month}</td>
+                    <td className="px-2 py-1 text-center flex items-center justify-center gap-2">
+                      {item.id}
+                      {/* Bild-ikon: grön om bilder finns, röd annars */}
+                      <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                        title={item.images && item.images.length > 0 ? 'Bilder finns' : 'Inga bilder'}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {/* öppna bildmodal här */}}
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-center">{item.name}</td>
+                    <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
+                    <td className="px-2 py-1 text-center">{item.category}</td>
+                    <td className="px-2 py-1 text-center">{item.supplier}</td>
+                    <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toFixed(2)} kr</td>
+                    <td className="px-2 py-1 text-center">{item.note}</td>
+                    <td className="px-2 py-1 text-center">
+                      {/* Redigeringsknapp */}
+                      <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => {/* redigera logik */}}>
+                        <span role="img" aria-label="edit">✏️</span>
+                      </button>
+                      {/* Papperskorg */}
+                      <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => {/* radera logik */}}>
+                        <span role="img" aria-label="delete">🗑️</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

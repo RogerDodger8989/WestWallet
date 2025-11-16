@@ -28,22 +28,38 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
   error: '',
   fetchItems: async () => {
     set({ loading: true, error: '' });
-    // TODO: Anropa backend API
-    set({ loading: false });
+    try {
+      const items = await import('../api/economyApi').then(api => api.fetchEconomyItems());
+      set({ items, loading: false });
+    } catch (err: any) {
+      set({ error: err.message || 'Kunde inte hämta poster', loading: false });
+    }
   },
   addItem: async (item) => {
     set({ loading: true, error: '' });
-    // TODO: Anropa backend API
-    set({ loading: false });
+    try {
+      const newItem = await import('../api/economyApi').then(api => api.addEconomyItem(item));
+      set({ items: [...get().items, newItem], loading: false });
+    } catch (err: any) {
+      set({ error: err.message || 'Kunde inte spara post', loading: false });
+    }
   },
   updateItem: async (item) => {
     set({ loading: true, error: '' });
-    // TODO: Anropa backend API
-    set({ loading: false });
+    try {
+      const updated = await import('../api/economyApi').then(api => api.updateEconomyItem(item));
+      set({ items: get().items.map(i => i.id === updated.id ? updated : i), loading: false });
+    } catch (err: any) {
+      set({ error: err.message || 'Kunde inte uppdatera post', loading: false });
+    }
   },
   deleteItem: async (id) => {
     set({ loading: true, error: '' });
-    // TODO: Anropa backend API
-    set({ loading: false });
+    try {
+      await import('../api/economyApi').then(api => api.deleteEconomyItem(id));
+      set({ items: get().items.filter(i => i.id !== id), loading: false });
+    } catch (err: any) {
+      set({ error: err.message || 'Kunde inte radera post', loading: false });
+    }
   },
 }));

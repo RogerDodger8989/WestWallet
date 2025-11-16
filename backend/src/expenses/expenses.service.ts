@@ -33,6 +33,10 @@ export class ExpensesService {
   ) {}
 
   async create(data: Partial<Expense>): Promise<ExpenseDocument> {
+    // Generera displayId om det saknas
+    if (!data.displayId) {
+      data.displayId = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    }
     const doc = await new this.expenseModel(data).save();
     await this.auditLogService?.log({
       action: 'create',
