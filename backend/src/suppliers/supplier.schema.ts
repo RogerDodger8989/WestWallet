@@ -5,7 +5,7 @@ export type SupplierDocument = Supplier & Document;
 
 @Schema()
 export class Supplier {
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   name: string;
 
   @Prop({ required: true })
@@ -16,3 +16,4 @@ export class Supplier {
 }
 
 export const SupplierSchema = SchemaFactory.createForClass(Supplier);
+SupplierSchema.index({ name: 1, categoryId: 1 }, { unique: true });

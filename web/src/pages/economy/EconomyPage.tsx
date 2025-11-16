@@ -8,38 +8,56 @@ const EconomyPage: React.FC = () => {
   // State för modaler och val
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, _setSelectedCategory] = useState(() => localStorage.getItem('selectedCategory') || '');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSupplierName, setNewSupplierName] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [selectedSupplier, _setSelectedSupplier] = useState(() => localStorage.getItem('selectedSupplier') || '');
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState('income');
   const [month, setMonth] = useState('');
   const [note, setNote] = useState('');
+
+  // Custom setters to persist selection
+  const setSelectedCategory = (id: string) => {
+    _setSelectedCategory(id);
+    localStorage.setItem('selectedCategory', id);
+  };
+  const setSelectedSupplier = (id: string) => {
+    _setSelectedSupplier(id);
+    localStorage.setItem('selectedSupplier', id);
+  };
   const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
   const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
 
-  // Filtrera leverantörer baserat på vald kategori
-  const filteredSuppliers = suppliers.filter(s => s.categoryId === selectedCategory);
+  // Visa alla leverantörer, men dropdown är disabled tills kategori är vald
+  const allSuppliers = suppliers;
 
   // Hämta kategorier vid sidladdning
   React.useEffect(() => {
-    fetchCategories();
+    fetchCategories().then(() => {
+      console.log('categories after fetch:', categories);
+      console.log('selectedCategory after fetch:', selectedCategory);
+    });
   }, [fetchCategories]);
 
-  // Förvälj första kategori och leverantör vid sidladdning
+  // Auto-select supplier when a new one is created
   React.useEffect(() => {
-    if (categories.length > 0 && !selectedCategory) {
-      setSelectedCategory(categories[0].id);
+    if (!selectedCategory) {
+      setSelectedSupplier('');
+      return;
     }
-  }, [categories]);
+    if (suppliers.length > 0) {
+      // If selectedSupplier is not in suppliers, auto-select first
+      if (!selectedSupplier || !suppliers.find(sup => sup._id === selectedSupplier || sup.id === selectedSupplier)) {
+        setSelectedSupplier(suppliers[0]._id || suppliers[0].id);
+        console.log('Auto-set selectedSupplier to', suppliers[0]._id || suppliers[0].id);
+      }
+    } else {
+      setSelectedSupplier('');
+    }
+  }, [selectedCategory, suppliers]);
 
-  React.useEffect(() => {
-    if (filteredSuppliers.length > 0 && !selectedSupplier) {
-      setSelectedSupplier(filteredSuppliers[0].id);
-    }
-  }, [filteredSuppliers]);
 
   // Toast state
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
@@ -57,42 +75,30 @@ const EconomyPage: React.FC = () => {
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName.trim()) {
-      await addCategory(newCategoryName.trim());
-      setTimeout(() => {
-        if (useCategoryStore.getState().error) {
-          setToast({ message: useCategoryStore.getState().error, type: 'error' });
-          useCategoryStore.setState({ error: '' });
-        } else {
-          // Välj den senast skapade kategorin
-          const latest = useCategoryStore.getState().categories.slice(-1)[0];
-          if (latest) setSelectedCategory(latest.id);
-          setToast({ message: 'Kategori skapad!', type: 'success' });
-          setShowCategoryModal(false);
-          setNewCategoryName('');
-        }
-      }, 100);
+      const response = await addCategory(newCategoryName.trim());
+      // Sätt alltid till _id från backend-svaret
+      if (response && response._id) {
+        setSelectedCategory(response._id);
+        fetchSuppliers(response._id);
+        setSelectedSupplier('');
+      }
+      setToast({ message: 'Kategori skapad!', type: 'success' });
+      setShowCategoryModal(false);
+      setNewCategoryName('');
     }
   };
 
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newSupplierName.trim() && selectedCategory) {
-      await addSupplier(newSupplierName.trim(), selectedCategory);
-      setTimeout(() => {
-        if (useSupplierStore.getState().error) {
-          setToast({ message: useSupplierStore.getState().error, type: 'error' });
-          useSupplierStore.setState({ error: '' });
-        } else {
-          // Välj den senast skapade leverantören
-          const latest = useSupplierStore.getState().suppliers.slice(-1)[0];
-          if (latest && latest.categoryId === selectedCategory) {
-            setSelectedSupplier(latest.id);
-          }
-          setToast({ message: 'Leverantör skapad!', type: 'success' });
-          setShowSupplierModal(false);
-          setNewSupplierName('');
-        }
-      }, 100);
+    if (newSupplierName.trim()) {
+      const response = await addSupplier(newSupplierName.trim());
+      if (response && response._id) {
+        setSelectedSupplier(response._id);
+        fetchSuppliers();
+      }
+      setToast({ message: 'Leverantör skapad!', type: 'success' });
+      setShowSupplierModal(false);
+      setNewSupplierName('');
     }
   };
 
@@ -142,12 +148,12 @@ const EconomyPage: React.FC = () => {
               onChange={e => {
                 setSelectedCategory(e.target.value);
                 fetchSuppliers(e.target.value);
-                setSelectedSupplier('');
+                // selectedSupplier sätts automatiskt via useEffect
               }}
             >
               <option value="">Välj kategori</option>
               {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <option key={cat._id || cat.id || cat.name} value={cat._id || cat.id}>{cat.name}</option>
               ))}
             </select>
             <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowCategoryModal(true)}>+</button>
@@ -161,8 +167,8 @@ const EconomyPage: React.FC = () => {
               onChange={e => setSelectedSupplier(e.target.value)}
             >
               <option value="">Välj leverantör</option>
-              {filteredSuppliers.map(sup => (
-                <option key={sup.id} value={sup.id}>{sup.name}</option>
+              {suppliers.map(sup => (
+                <option key={sup._id || sup.id || sup.name} value={sup._id || sup.id}>{sup.name}</option>
               ))}
             </select>
             <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(true)} disabled={!selectedCategory}>+</button>

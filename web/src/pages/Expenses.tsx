@@ -1,0 +1,3 @@
+// Kopia av Expenses.tsx, flyttad till rätt mapp
+// Justera importvägar efter projektstruktur
+// ...existing code...

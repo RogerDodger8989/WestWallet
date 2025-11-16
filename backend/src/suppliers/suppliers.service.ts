@@ -10,16 +10,32 @@ export class SuppliersService {
   ) {}
 
   async create(name: string, categoryId: string): Promise<SupplierDocument> {
-    const exists = await this.supplierModel.findOne({ name, categoryId });
-    if (exists) throw new BadRequestException('Leverantör finns redan');
-    // Generera displayId
-    const last = await this.supplierModel.findOne().sort({ displayId: -1 });
-    let nextId = 'S000001';
-    if (last && last.displayId) {
-      const num = parseInt(last.displayId.slice(1)) + 1;
-      nextId = 'S' + num.toString().padStart(6, '0');
+    try {
+      if (!name || !categoryId) {
+        console.error('Missing name or categoryId:', { name, categoryId });
+        throw new BadRequestException('Namn och kategori måste anges');
+      }
+      // Dublettkontroll: returnera existerande om exakt samma finns
+      const exists = await this.supplierModel.findOne({ name, categoryId });
+      if (exists) {
+        console.log('Supplier already exists, returning existing:', exists);
+        return exists;
+      }
+      // Generera displayId
+      const last = await this.supplierModel.findOne().sort({ displayId: -1 });
+      let nextId = 'S000001';
+      if (last && last.displayId) {
+        const num = parseInt(last.displayId.slice(1)) + 1;
+        nextId = 'S' + num.toString().padStart(6, '0');
+      }
+      const supplier = new this.supplierModel({ name, categoryId, displayId: nextId });
+      const saved = await supplier.save();
+      console.log('Supplier created:', saved);
+      return saved;
+    } catch (error) {
+      console.error('Error creating supplier:', error);
+      throw error;
     }
-    return new this.supplierModel({ name, categoryId, displayId: nextId }).save();
   }
 
   async findAll(categoryId?: string): Promise<SupplierDocument[]> {
@@ -36,9 +52,7 @@ export class SuppliersService {
   async update(id: string, name: string, categoryId: string): Promise<SupplierDocument> {
     const sup = await this.supplierModel.findById(id);
     if (!sup) {
-      const error: any = new NotFoundException('Leverantör hittades inte');
-      error.errorCode = 'SUPPLIER_NOT_FOUND';
-      throw error;
+      throw new NotFoundException('Supplier not found');
     }
     sup.name = name;
     sup.categoryId = categoryId;
