@@ -6,6 +6,12 @@ import Toast from '../../components/Toast';
 import { useEconomyStore } from '../../store/useEconomyStore';
 
 const EconomyPage: React.FC = () => {
+      // Modal för notering
+      const [showNoteModal, setShowNoteModal] = useState(false);
+      const [noteModalContent, setNoteModalContent] = useState('');
+      // Undo state
+      const [undoData, setUndoData] = useState<{ item: EconomyItem, type: 'delete' | 'edit', prev?: EconomyItem } | null>(null);
+      const [undoTimeout, setUndoTimeout] = useState<number | null>(null);
     // Hjälpfunktioner för att slå upp namn
     const getCategoryName = (id: string) => {
       const cat = categories.find(cat => cat.id === id || cat.name === id);
@@ -161,7 +167,8 @@ const EconomyPage: React.FC = () => {
     const [yearStr, monthStr] = editMonth.split('-');
     const year = parseInt(yearStr, 10);
     const monthNum = parseInt(monthStr, 10);
-    await useEconomyStore.getState().updateItem({
+    const prevItem = { ...selectedItem! };
+    const updatedItem = {
       ...selectedItem!,
       name: editName,
       amount: parseFloat(editAmount),
@@ -171,16 +178,18 @@ const EconomyPage: React.FC = () => {
       category: editCategory,
       supplier: editSupplier,
       note: editNote,
-    });
-    setToast({ message: 'Post uppdaterad!', type: 'success' });
+    };
+    await useEconomyStore.getState().updateItem(updatedItem);
     setShowEditModal(false);
     setSelectedItem(null);
+    setUndoData({ item: updatedItem, type: 'edit', prev: prevItem });
+    if (undoTimeout) clearTimeout(undoTimeout);
+    setUndoTimeout(setTimeout(() => setUndoData(null), 10000));
   };
 
   // Hantera radering av post
   const handleDeleteExpense = async () => {
     if (!selectedItem) return;
-    // Kontrollera att id är en giltig ObjectId (24 tecken hexsträng)
     const validObjectId = /^[a-fA-F0-9]{24}$/.test(selectedItem.id);
     if (!validObjectId) {
       setToast({ message: 'Kan inte radera: ogiltigt id', type: 'error' });
@@ -188,10 +197,13 @@ const EconomyPage: React.FC = () => {
       setSelectedItem(null);
       return;
     }
+    const deletedItem = { ...selectedItem };
     await useEconomyStore.getState().deleteItem(selectedItem.id);
-    setToast({ message: 'Post raderad!', type: 'success' });
     setShowDeleteModal(false);
     setSelectedItem(null);
+    setUndoData({ item: deletedItem, type: 'delete' });
+    if (undoTimeout) clearTimeout(undoTimeout);
+    setUndoTimeout(setTimeout(() => setUndoData(null), 10000));
   };
 
   return (
@@ -351,7 +363,10 @@ const EconomyPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.filter(item => /^[a-fA-F0-9]{24}$/.test(item.id)).map((item, index) => (
+                {items
+                  .filter(item => /^[a-fA-F0-9]{24}$/.test(item.id))
+                  .filter(item => item.name && item.category && item.supplier && typeof item.amount === 'number')
+                  .map((item, index) => (
                   <tr key={(item.id || '') + '-' + index} className="border-b text-center">
                     <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
                     <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
@@ -360,20 +375,24 @@ const EconomyPage: React.FC = () => {
                     <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
                     <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
                     <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toFixed(2)} kr</td>
-                    <td className="px-2 py-1 text-center flex items-center justify-center">
+                    <td className="px-2 py-1 text-center">
                       <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
                         title={item.images && item.images.length > 0 ? 'Bilder finns' : 'Inga bilder'}
                         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
                         onClick={() => {/* öppna bildmodal här */}}
                       />
                     </td>
-                    <td className="px-2 py-1 text-center">{item.note}</td>
                     <td className="px-2 py-1 text-center">
-                      {/* Redigeringsknapp */}
+                      <span className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                        title={item.note && item.note.length > 0 ? 'Notering finns' : 'Ingen notering'}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                        onClick={() => { setNoteModalContent(item.note || ''); setShowNoteModal(true); }}
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-center">
                       <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => openEditModal(item)}>
                         <span role="img" aria-label="edit">✏️</span>
                       </button>
-                      {/* Papperskorg */}
                       <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => openDeleteModal(item)}>
                         <span role="img" aria-label="delete">🗑️</span>
                       </button>
@@ -384,7 +403,67 @@ const EconomyPage: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
+      {/* Modal för notering */}
+      {showNoteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-80">
+            <h3 className="font-semibold mb-2">Notering</h3>
+            <p>{noteModalContent ? noteModalContent : 'Ingen notering'}</p>
+            <div className="flex gap-2 justify-end mt-4">
+              <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => setShowNoteModal(false)}>Stäng</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Toast med ångerknapp uppe till höger */}
+      {undoData && (
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 1000 }}>
+          <div className="bg-blue-600 text-white px-4 py-2 rounded shadow flex items-center gap-4">
+            {undoData.type === 'delete' ? 'Post raderad!' : 'Post uppdaterad!'}
+            <button className="bg-white text-blue-600 px-2 py-1 rounded" onClick={async () => {
+              if (undoTimeout) clearTimeout(undoTimeout);
+              setUndoTimeout(null);
+              if (undoData.type === 'delete') {
+                await useEconomyStore.getState().addItem(undoData.item);
+              } else if (undoData.type === 'edit' && undoData.prev) {
+                await useEconomyStore.getState().updateItem(undoData.prev);
+              }
+              setUndoData(null);
+            }}>Ångra</button>
+          </div>
+        </div>
+      )}
+    </div>
+      {/* Modal för notering */}
+      {showNoteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-80">
+            <h3 className="font-semibold mb-2">Notering</h3>
+            <p>{noteModalContent ? noteModalContent : 'Ingen notering'}</p>
+            <div className="flex gap-2 justify-end mt-4">
+              <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => setShowNoteModal(false)}>Stäng</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Toast med ångerknapp uppe till höger */}
+      {undoData && (
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 1000 }}>
+          <div className="bg-blue-600 text-white px-4 py-2 rounded shadow flex items-center gap-4">
+            {undoData.type === 'delete' ? 'Post raderad!' : 'Post uppdaterad!'}
+            <button className="bg-white text-blue-600 px-2 py-1 rounded" onClick={async () => {
+              if (undoTimeout) clearTimeout(undoTimeout);
+              setUndoTimeout(null);
+              if (undoData.type === 'delete') {
+                await useEconomyStore.getState().addItem(undoData.item);
+              } else if (undoData.type === 'edit' && undoData.prev) {
+                await useEconomyStore.getState().updateItem(undoData.prev);
+              }
+              setUndoData(null);
+            }}>Ångra</button>
+          </div>
+        </div>
+      )}
       {/* Modal för redigering */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -432,6 +511,6 @@ const EconomyPage: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
 export default EconomyPage;
