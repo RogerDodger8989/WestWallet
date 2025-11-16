@@ -33,22 +33,15 @@ const EconomyPage: React.FC = () => {
   // Visa alla leverantörer, men dropdown är disabled tills kategori är vald
   const allSuppliers = suppliers;
 
-  // Hämta kategorier vid sidladdning
+  // Hämta kategorier och leverantörer vid sidladdning
   React.useEffect(() => {
-    fetchCategories().then(() => {
-      console.log('categories after fetch:', categories);
-      console.log('selectedCategory after fetch:', selectedCategory);
-    });
-  }, [fetchCategories]);
+    fetchCategories();
+    fetchSuppliers();
+  }, []);
 
-  // Auto-select supplier when a new one is created
+  // Auto-select supplier when suppliers change
   React.useEffect(() => {
-    if (!selectedCategory) {
-      setSelectedSupplier('');
-      return;
-    }
     if (suppliers.length > 0) {
-      // If selectedSupplier is not in suppliers, auto-select first
       if (!selectedSupplier || !suppliers.find(sup => sup._id === selectedSupplier || sup.id === selectedSupplier)) {
         setSelectedSupplier(suppliers[0]._id || suppliers[0].id);
         console.log('Auto-set selectedSupplier to', suppliers[0]._id || suppliers[0].id);
@@ -56,7 +49,7 @@ const EconomyPage: React.FC = () => {
     } else {
       setSelectedSupplier('');
     }
-  }, [selectedCategory, suppliers]);
+  }, [suppliers]);
 
 
   // Toast state
