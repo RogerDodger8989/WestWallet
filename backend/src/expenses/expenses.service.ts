@@ -33,9 +33,14 @@ export class ExpensesService {
   ) {}
 
   async create(data: Partial<Expense>): Promise<ExpenseDocument> {
-    // Generera displayId om det saknas
+    // Generera displayId som löpnummer med prefix 'A' och fem siffror
     if (!data.displayId) {
-      data.displayId = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+      const last = await this.expenseModel.findOne({}, {}, { sort: { displayId: -1 } });
+      let nextNum = 1;
+      if (last && last.displayId && /^A\d{5}$/.test(last.displayId)) {
+        nextNum = parseInt(last.displayId.slice(1), 10) + 1;
+      }
+      data.displayId = `A${nextNum.toString().padStart(5, '0')}`;
     }
     const doc = await new this.expenseModel(data).save();
     await this.auditLogService?.log({

@@ -2,13 +2,14 @@ import { create } from 'zustand';
 
 export interface EconomyItem {
   id: string;
+  displayId: string;
   name: string;
   amount: number;
   type: 'income' | 'expense';
   category: string;
   supplier: string;
   note?: string;
-  month: string;
+  month: number;
   year: number;
   images?: string[];
 }

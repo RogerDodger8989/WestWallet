@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import type { EconomyItem } from '../../store/useEconomyStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
 import Toast from '../../components/Toast';
 import { useEconomyStore } from '../../store/useEconomyStore';
 
 const EconomyPage: React.FC = () => {
+    // Hjälpfunktioner för att slå upp namn
+    const getCategoryName = (id: string) => {
+      const cat = categories.find(cat => cat.id === id || cat.name === id);
+      return cat ? cat.name : 'Okänd';
+    };
+    const getSupplierName = (id: string) => {
+      const sup = suppliers.find(sup => sup.id === id || sup.name === id);
+      return sup ? sup.name : 'Okänd';
+    };
   // State för modaler och val
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<EconomyItem | null>(null);
   const [selectedCategory, _setSelectedCategory] = useState(() => localStorage.getItem('selectedCategory') || '');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -17,6 +30,14 @@ const EconomyPage: React.FC = () => {
   const [type, setType] = useState('income');
   const [month, setMonth] = useState('');
   const [note, setNote] = useState('');
+  // State för redigering
+  const [editName, setEditName] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editType, setEditType] = useState('income');
+  const [editMonth, setEditMonth] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editSupplier, setEditSupplier] = useState('');
+  const [editNote, setEditNote] = useState('');
 
   // Custom setters to persist selection
   const setSelectedCategory = (id: string) => {
@@ -94,10 +115,10 @@ const EconomyPage: React.FC = () => {
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Hämta år och månad som number
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
+    // month är YYYY-MM, dela upp till year och month (number)
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
     await addItem({
       name,
       amount: Number(amount),
@@ -106,12 +127,71 @@ const EconomyPage: React.FC = () => {
       supplier: selectedSupplier,
       note,
       year,
-      month,
+      month: monthNum,
     });
     setToast({ message: 'Post sparad!', type: 'success' });
     setName('');
     setAmount('');
     setNote('');
+  };
+
+  // Hantera öppning av redigeringsmodal
+  const openEditModal = (item: EconomyItem) => {
+    setSelectedItem(item);
+    setEditName(item.name);
+    setEditAmount(item.amount.toString());
+    setEditType(item.type);
+    setEditMonth(`${item.year}-${item.month.toString().padStart(2, '0')}`);
+    setEditCategory(item.category);
+    setEditSupplier(item.supplier);
+    setEditNote(item.note || '');
+    setShowEditModal(true);
+  };
+
+  // Hantera öppning av raderingsmodal
+  const openDeleteModal = (item: EconomyItem) => {
+    setSelectedItem(item);
+    setShowDeleteModal(true);
+  };
+
+  // Hantera redigering av post
+  const handleEditExpense = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedItem) return;
+    const [yearStr, monthStr] = editMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
+    await useEconomyStore.getState().updateItem({
+      ...selectedItem!,
+      name: editName,
+      amount: parseFloat(editAmount),
+      type: editType as 'income' | 'expense',
+      year,
+      month: monthNum,
+      category: editCategory,
+      supplier: editSupplier,
+      note: editNote,
+    });
+    setToast({ message: 'Post uppdaterad!', type: 'success' });
+    setShowEditModal(false);
+    setSelectedItem(null);
+  };
+
+  // Hantera radering av post
+  const handleDeleteExpense = async () => {
+    if (!selectedItem) return;
+    // Kontrollera att id är en giltig ObjectId (24 tecken hexsträng)
+    const validObjectId = /^[a-fA-F0-9]{24}$/.test(selectedItem.id);
+    if (!validObjectId) {
+      setToast({ message: 'Kan inte radera: ogiltigt id', type: 'error' });
+      setShowDeleteModal(false);
+      setSelectedItem(null);
+      return;
+    }
+    await useEconomyStore.getState().deleteItem(selectedItem.id);
+    setToast({ message: 'Post raderad!', type: 'success' });
+    setShowDeleteModal(false);
+    setSelectedItem(null);
   };
 
   return (
@@ -271,22 +351,14 @@ const EconomyPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, index) => (
+                {items.filter(item => /^[a-fA-F0-9]{24}$/.test(item.id)).map((item, index) => (
                   <tr key={(item.id || '') + '-' + index} className="border-b text-center">
-                    <td className="px-2 py-1 text-center">{
-                      // Visa alltid månad som YYYY-MM
-                      (() => {
-                        if (item.month && /^\d{4}-\d{2}$/.test(item.month)) return item.month;
-                        const year = item.year || new Date().getFullYear();
-                        const monthNum = String(item.month).padStart(2, '0');
-                        return `${year}-${monthNum}`;
-                      })()
-                    }</td>
-                    <td className="px-2 py-1 text-center">{item.id}</td>
+                    <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
+                    <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
                     <td className="px-2 py-1 text-center">{item.name}</td>
                     <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
-                    <td className="px-2 py-1 text-center">{item.category}</td>
-                    <td className="px-2 py-1 text-center">{item.supplier}</td>
+                    <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
+                    <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
                     <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toFixed(2)} kr</td>
                     <td className="px-2 py-1 text-center flex items-center justify-center">
                       <span className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
@@ -298,11 +370,11 @@ const EconomyPage: React.FC = () => {
                     <td className="px-2 py-1 text-center">{item.note}</td>
                     <td className="px-2 py-1 text-center">
                       {/* Redigeringsknapp */}
-                      <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => {/* redigera logik */}}>
+                      <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => openEditModal(item)}>
                         <span role="img" aria-label="edit">✏️</span>
                       </button>
                       {/* Papperskorg */}
-                      <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => {/* radera logik */}}>
+                      <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => openDeleteModal(item)}>
                         <span role="img" aria-label="delete">🗑️</span>
                       </button>
                     </td>
@@ -313,6 +385,51 @@ const EconomyPage: React.FC = () => {
           </div>
         )}
       </div>
+      {/* Modal för redigering */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <form className="bg-white dark:bg-slate-900 p-6 rounded shadow w-96" onSubmit={handleEditExpense}>
+            <h3 className="font-semibold mb-2">Redigera post</h3>
+            <input type="text" placeholder="Namn" className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editName} onChange={e => setEditName(e.target.value)} />
+            <input type="number" step="0.01" placeholder="Belopp (kr)" className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editAmount} onChange={e => setEditAmount(e.target.value)} />
+            <select className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editType} onChange={e => setEditType(e.target.value)}>
+              <option value="income">Inkomst</option>
+              <option value="expense">Utgift</option>
+            </select>
+            <input type="month" className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editMonth} onChange={e => setEditMonth(e.target.value)} />
+            <select className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editCategory} onChange={e => setEditCategory(e.target.value)}>
+              <option value="">Välj kategori</option>
+              {categories.map(cat => (
+                <option key={cat.id || cat.name} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+            <select className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editSupplier} onChange={e => setEditSupplier(e.target.value)}>
+              <option value="">Välj leverantör</option>
+              {suppliers.map(sup => (
+                <option key={sup.id || sup.name} value={sup.id}>{sup.name}</option>
+              ))}
+            </select>
+            <textarea placeholder="Notering" className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" value={editNote} onChange={e => setEditNote(e.target.value)} />
+            <div className="flex gap-2 justify-end mt-2">
+              <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowEditModal(false); setSelectedItem(null); }}>Avbryt</button>
+              <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">Spara</button>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* Modal för radering */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-80">
+            <h3 className="font-semibold mb-2">Radera post</h3>
+            <p>Vill du radera denna post?</p>
+            <div className="flex gap-2 justify-end mt-4">
+              <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowDeleteModal(false); setSelectedItem(null); }}>Avbryt</button>
+              <button type="button" className="px-3 py-1 bg-red-600 text-white rounded" onClick={handleDeleteExpense}>Radera</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
