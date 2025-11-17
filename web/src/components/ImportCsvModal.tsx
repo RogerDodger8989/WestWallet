@@ -438,7 +438,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
               <div className="font-semibold mb-2 text-xs">Fältmappning (välj hur varje kolumn ska sparas):</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {csvHeaders.map((col) => (
-                  <div key={col} className="flex items-center gap-2 text-xs">
+                  <div key={col} className="flex items-center gap-2 text-xs relative">
                     <span className="w-32 truncate">{col}</span>
                     <select
                       className="border rounded px-2 py-1"
@@ -450,6 +450,23 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                         <option key={f.key} value={f.key}>{f.label}</option>
                       ))}
                     </select>
+                    {/* Varningstriangel vid krock */}
+                    {(() => {
+                      const val = fieldMapping[col];
+                      if (!val) return null;
+                      const mappedCols = Object.entries(fieldMapping).filter(([c, v]) => v === val);
+                      if (mappedCols.length > 1) {
+                        return (
+                          <span title="Fältkrock! Flera kolumner har samma mappning." className="ml-1 text-yellow-600">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{display:'inline'}}>
+                              <polygon points="10,2 18,18 2,18" />
+                              <text x="10" y="15" textAnchor="middle" fontSize="10" fill="black">!</text>
+                            </svg>
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 ))}
               </div>
@@ -547,7 +564,15 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 type="button"
                 className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700"
                 onClick={handleImportSelected}
-                disabled={Object.values(fieldMapping).filter(Boolean).length < 3 || selectedRows.length === 0}
+                disabled={
+                  Object.values(fieldMapping).filter(Boolean).length < 3 ||
+                  selectedRows.length === 0 ||
+                  (() => {
+                    // Krock: om något internfält är valt för flera kolumner
+                    const used = Object.values(fieldMapping).filter(Boolean);
+                    return used.length !== new Set(used).size;
+                  })()
+                }
               >
                 {importing ? "Importerar..." : "Importera markerade fält"}
               </button>
