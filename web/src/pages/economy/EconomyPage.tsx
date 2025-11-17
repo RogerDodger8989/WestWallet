@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MonthPicker from '../../components/MonthPicker';
+import ImportCsvModal from '../../components/ImportCsvModal';
 import type { EconomyItem } from '../../store/useEconomyStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
@@ -224,6 +225,7 @@ const EconomyPage: React.FC = () => {
       {/* Formulär med kategori/leverantör-dropdowns och plus-knapp */}
       {/* Ingen vanlig toast, endast UndoToast används nu */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow mb-8">
+        <ImportCsvModal open={showImportModal} onClose={() => setShowImportModal(false)} />
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Lägg till ny post</h2>
           <button
