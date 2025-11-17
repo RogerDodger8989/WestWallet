@@ -12,6 +12,8 @@ const EconomyPage: React.FC = () => {
       // Modal för notering
       const [showNoteModal, setShowNoteModal] = useState(false);
       const [noteModalContent, setNoteModalContent] = useState('');
+      // Modal för import
+      const [showImportModal, setShowImportModal] = useState(false);
       // Undo state
       const [undoData, setUndoData] = useState<{ item: EconomyItem, type: 'delete' | 'edit', prev?: EconomyItem } | null>(null);
       const [undoTimeout, setUndoTimeout] = useState<number | null>(null);
@@ -222,7 +224,19 @@ const EconomyPage: React.FC = () => {
       {/* Formulär med kategori/leverantör-dropdowns och plus-knapp */}
       {/* Ingen vanlig toast, endast UndoToast används nu */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow mb-8">
-        <h2 className="font-semibold mb-4">Lägg till ny post</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold">Lägg till ny post</h2>
+          <button
+            type="button"
+            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+            style={{ minWidth: 120 }}
+            onClick={() => setShowImportModal(true)}
+          >
+            Importera CSV
+          </button>
+        </div>
+          // State för importmodal
+          const [showImportModal, setShowImportModal] = useState(false);
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
           e.preventDefault();
           if (!name || !amount || !type || !month || !selectedCategory || !selectedSupplier) {
