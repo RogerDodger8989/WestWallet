@@ -8,6 +8,36 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+
+  const handleSelectRow = (idx: number) => {
+    setSelectedRows((prev) =>
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (csvData.length === selectedRows.length) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(csvData.map((_, i) => i));
+    }
+  };
+
+        const handleImport = () => {
+          // Extrahera mappade fält från markerade rader
+          const mapped = selectedRows.map(idx => {
+            const row = csvData[idx];
+            return {
+              month: row[Object.keys(fieldMapping).find(k => fieldMapping[k] === "date") || ""] || "",
+              name: row[Object.keys(fieldMapping).find(k => fieldMapping[k] === "description") || ""] || "",
+              amount: row[Object.keys(fieldMapping).find(k => fieldMapping[k] === "amount") || ""] || "",
+            };
+          });
+          // Här kan du skicka mapped till backend eller vidare i appen
+          alert(`Importerar ${mapped.length} transaktioner!`);
+          onClose();
+        };
       // För fältmappning
       const internalFields = [
         { key: "date", label: "Datum" },
@@ -147,6 +177,13 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
               <table className="w-full text-sm border">
                 <thead>
                   <tr>
+                    <th className="border px-2 py-1 bg-gray-100 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.length === csvData.length && csvData.length > 0}
+                        onChange={handleSelectAll}
+                      />
+                    </th>
                     {csvHeaders.map((col) => (
                       <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
                     ))}
@@ -155,6 +192,13 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 <tbody>
                   {csvData.map((row, i) => (
                     <tr key={i}>
+                      <td className="border px-2 py-1 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(i)}
+                          onChange={() => handleSelectRow(i)}
+                        />
+                      </td>
                       {csvHeaders.map((col) => (
                         <td key={col} className="border px-2 py-1">{row[col]}</td>
                       ))}
@@ -162,6 +206,19 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-xs text-gray-600">
+                {selectedRows.length} av {csvData.length} poster valda för import
+              </div>
+              <button
+                type="button"
+                className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700"
+                onClick={handleImport}
+                disabled={Object.values(fieldMapping).filter(Boolean).length < 3 || selectedRows.length === 0}
+              >
+                Importera markerade fält
+              </button>
             </div>
           </div>
         )}
