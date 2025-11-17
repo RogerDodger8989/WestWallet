@@ -8,6 +8,22 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
+      // För fältmappning
+      const internalFields = [
+        { key: "date", label: "Datum" },
+        { key: "amount", label: "Belopp" },
+        { key: "description", label: "Beskrivning" },
+        { key: "reference", label: "Referens" },
+        { key: "account", label: "Kontonummer" },
+        { key: "currency", label: "Valuta" },
+        // Lägg till fler vid behov
+      ];
+      const [fieldMapping, setFieldMapping] = useState<{ [csvCol: string]: string }>({});
+
+      const handleMappingChange = (csvCol: string, internalKey: string) => {
+        setFieldMapping((prev) => ({ ...prev, [csvCol]: internalKey }));
+      };
+    const [headerLineIdx, setHeaderLineIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [csvData, setCsvData] = useState<any[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
@@ -35,17 +51,18 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
 
         // Hitta första raden med flest fält (troligen header)
         const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-        let headerLineIdx = 0;
+        let headerIdx = 0;
         let maxFields = 0;
         lines.forEach((line, idx) => {
           const fields = line.split(",");
           if (fields.length > maxFields) {
             maxFields = fields.length;
-            headerLineIdx = idx;
+            headerIdx = idx;
           }
         });
+        setHeaderLineIdx(headerIdx + 1); // Visa 1-baserad radnummer
         // Skapa en ny text med bara header och data
-        const cleanText = lines.slice(headerLineIdx).join("\n");
+        const cleanText = lines.slice(headerIdx).join("\n");
 
         const parsed = Papa.parse(cleanText, {
           header: true,
@@ -55,15 +72,26 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
           setCsvError("Fel vid tolkning av CSV: " + parsed.errors[0].message);
           setCsvData([]);
           setCsvHeaders([]);
+          setFieldMapping({});
         } else {
           setCsvError(null);
           setCsvData(parsed.data as any[]);
           setCsvHeaders(parsed.meta.fields || []);
+          // Automatisk fältmappning
+          const autoMap: { [csvCol: string]: string } = {};
+          (parsed.meta.fields || []).forEach(col => {
+            if (col.toLowerCase().includes("transaktionsdag")) autoMap[col] = "date";
+            else if (col.toLowerCase().includes("beskrivning")) autoMap[col] = "description";
+            else if (col.toLowerCase().includes("belopp")) autoMap[col] = "amount";
+          });
+          setFieldMapping(autoMap);
         }
       } catch (err) {
         setCsvError("Fel vid uppladdning av fil.");
         setCsvData([]);
         setCsvHeaders([]);
+        setFieldMapping({});
+        setHeaderLineIdx(null);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -86,27 +114,55 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
           className="mb-4"
           onChange={handleFileChange}
         />
+          {headerLineIdx && csvHeaders.length > 0 && (
+            <div className="text-xs text-gray-600 mb-2">
+              Header-rad identifierad: Rad {headerLineIdx} – {csvHeaders.join(", ")}
+            </div>
+          )}
         {csvError && <div className="text-red-600 mb-2">{csvError}</div>}
         {csvData.length > 0 && (
-          <div className="overflow-auto max-h-96 mb-4">
-            <table className="w-full text-sm border">
-              <thead>
-                <tr>
-                  {csvHeaders.map((col) => (
-                    <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {csvData.map((row, i) => (
-                  <tr key={i}>
+          <div>
+            <div className="mb-4 p-2 border rounded bg-gray-50">
+              {/* Fältmappning UI */}
+              <div className="font-semibold mb-2 text-sm">Mappa CSV-kolumner till interna fält:</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {csvHeaders.map((col) => (
+                  <div key={col} className="flex items-center gap-2 text-xs">
+                    <span className="w-40 truncate" title={col}>{col}</span>
+                    <select
+                      className="border rounded px-2 py-1"
+                      value={fieldMapping[col] || ""}
+                      onChange={e => handleMappingChange(col, e.target.value)}
+                    >
+                      <option value="">Ingen mappning</option>
+                      {internalFields.map(f => (
+                        <option key={f.key} value={f.key}>{f.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="overflow-auto max-h-96 mb-4">
+              <table className="w-full text-sm border">
+                <thead>
+                  <tr>
                     {csvHeaders.map((col) => (
-                      <td key={col} className="border px-2 py-1">{row[col]}</td>
+                      <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {csvData.map((row, i) => (
+                    <tr key={i}>
+                      {csvHeaders.map((col) => (
+                        <td key={col} className="border px-2 py-1">{row[col]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
         <div className="flex gap-2 justify-end mt-6">
