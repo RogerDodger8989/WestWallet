@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import MonthPicker from '../../components/MonthPicker';
 import type { EconomyItem } from '../../store/useEconomyStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
@@ -255,7 +256,7 @@ const EconomyPage: React.FC = () => {
             <option value="income">Inkomst</option>
             <option value="expense">Utgift</option>
           </select>
-          <input type="month" className="p-2 rounded border dark:bg-slate-800 dark:text-white" required value={month} onChange={e => setMonth(e.target.value)} />
+          <MonthPicker value={month} onChange={e => setMonth(e.target.value)} />
           <div className="flex items-center gap-2">
             <select
               className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full"
@@ -617,7 +618,7 @@ const EconomyPage: React.FC = () => {
               <option value="income">Inkomst</option>
               <option value="expense">Utgift</option>
             </select>
-            <input type="month" className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editMonth} onChange={e => setEditMonth(e.target.value)} />
+            <MonthPicker value={editMonth} onChange={e => setEditMonth(e.target.value)} />
             <select className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editCategory} onChange={e => setEditCategory(e.target.value)}>
               <option value="">Välj kategori</option>
               {categories.map(cat => (
