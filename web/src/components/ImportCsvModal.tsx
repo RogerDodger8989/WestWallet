@@ -20,6 +20,7 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
+      const [showOnlySelected, setShowOnlySelected] = useState(false);
     const { rules, addRule, deleteRule, fetchAll } = useRuleStore();
     useEffect(() => {
       if (open) {
@@ -427,6 +428,32 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 )}
               </div>
             </div>
+            <div className="mb-2 flex items-center gap-4">
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={showOnlySelected} onChange={e => setShowOnlySelected(e.target.checked)} />
+                Visa endast valda rader
+              </label>
+            </div>
+            <div className="mb-4 p-2 bg-gray-50 rounded border">
+              <div className="font-semibold mb-2 text-xs">Fältmappning (välj hur varje kolumn ska sparas):</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {csvHeaders.map((col) => (
+                  <div key={col} className="flex items-center gap-2 text-xs">
+                    <span className="w-32 truncate">{col}</span>
+                    <select
+                      className="border rounded px-2 py-1"
+                      value={fieldMapping[col] || ""}
+                      onChange={e => handleMappingChange(col, e.target.value)}
+                    >
+                      <option value="">Ignorera</option>
+                      {internalFields.map(f => (
+                        <option key={f.key} value={f.key}>{f.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="overflow-auto max-h-96 mb-4">
               <table className="w-full text-sm border">
                 <thead>
@@ -438,7 +465,10 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                         onChange={handleSelectAll}
                       />
                     </th>
-                    {csvHeaders.map((col) => (
+                    {(showOnlySelected
+                      ? csvHeaders.filter(col => fieldMapping[col])
+                      : csvHeaders
+                    ).map((col) => (
                       <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
                     ))}
                     <th className="border px-2 py-1 bg-gray-100">Kategori (regel)</th>
@@ -446,8 +476,14 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {csvData.map((row, i) => {
-                    // Applicera regler på previewItem
+                  {csvData.length === 0 ? (
+                    <tr>
+                      <td colSpan={csvHeaders.length + 3} className="border px-2 py-4 text-center text-gray-500">
+                        Ingen data
+                      </td>
+                    </tr>
+                  ) : csvData.map((row, i) => {
+                    // ...existing code...
                     const ruleCategory = getCategoryForRow(row);
                     const ruleSupplier = getSupplierForRow(row);
                     const previewItem = {
@@ -460,12 +496,14 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                       year: new Date(row[fieldMapping.date] || row["Datum"] || "").getFullYear() || new Date().getFullYear(),
                       month: new Date(row[fieldMapping.date] || row["Datum"] || "").getMonth() + 1 || new Date().getMonth() + 1,
                     };
-                    // Hitta matchande regel
+                    // ...existing code...
                     const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
                     const desc = descCol ? row[descCol] || "" : "";
                     const matchedRule = rules.find(rule => desc.toLowerCase().includes(rule.contains.toLowerCase()));
                     const matchesRule = !!matchedRule;
                     const duplicate = isDuplicate(previewItem, existingItems) && !matchesRule;
+                    // Filtrera kolumner om toggeln är aktiv
+                    const visibleCols = showOnlySelected ? csvHeaders.filter(col => fieldMapping[col]) : csvHeaders;
                     return (
                       <tr key={i} className={
                         duplicate ? "bg-gray-200" : matchesRule ? "bg-blue-50" : ""
@@ -478,7 +516,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                             disabled={duplicate}
                           />
                         </td>
-                        {csvHeaders.map((col) => (
+                        {visibleCols.map((col) => (
                           <td key={col} className="border px-2 py-1">{row[col]}</td>
                         ))}
                         <td className="border px-2 py-1 font-semibold text-blue-700">{ruleCategory}</td>
