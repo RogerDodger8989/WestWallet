@@ -41,6 +41,9 @@ import { HealthScoreModule } from './healthscore.module';
 import { HealthScoreController } from './healthscore.controller';
 import { ConfigModule } from './config.module';
 import { ConfigController } from './config.controller';
+import { RuleController } from './rule.controller';
+import { RuleService } from './rule.service';
+import { RuleSchema } from './models/rule.schema';
 
 dotenv.config();
 
@@ -56,6 +59,9 @@ dotenv.config();
       AuthModule,
       UsersModule,
       EmailModule,
+      MongooseModule.forFeature([
+        { name: 'Rule', schema: RuleSchema },
+      ]),
       MJMLModule,
       CategoriesModule,
       ExpensesModule,
@@ -79,7 +85,7 @@ dotenv.config();
       HealthScoreModule,
       ConfigModule,
   ],
-  controllers: [AdminController, AdminLogViewerController, AdminImpersonateController, BillingController, HealthScoreController, ConfigController],
+  controllers: [AdminController, AdminLogViewerController, AdminImpersonateController, BillingController, HealthScoreController, ConfigController, RuleController],
   providers: [
     AuditLogService,
     {
@@ -87,6 +93,7 @@ dotenv.config();
       useClass: RateLimitGuard,
     },
     AdminService,
+    RuleService,
   ],
 })
 export class AppModule {}

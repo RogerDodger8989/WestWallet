@@ -1,8 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
+import { useRuleStore } from "../store/useRuleStore";
 import { useCategoryStore } from "../store/useCategoryStore";
 import { useSupplierStore } from "../store/useSupplierStore";
+import { useEconomyStore } from "../store/useEconomyStore";
 import Papa from "papaparse";
 import { decode } from "iconv-lite-umd";
+import { addEconomyItem } from "../api/economyApi";
 
 interface Rule {
   id: number;
@@ -17,9 +20,16 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
+    const { rules, addRule, deleteRule, fetchAll } = useRuleStore();
+    useEffect(() => {
+      if (open) {
+        fetchAll();
+      }
+    }, [open, fetchAll]);
   // Zustand stores
   const { categories, addCategory, fetchCategories } = useCategoryStore();
   const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
+  const { items: existingItems, fetchItems } = useEconomyStore();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [newCategory, setNewCategory] = useState("");
@@ -31,8 +41,10 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     if (open) {
       fetchCategories();
       fetchSuppliers();
+      // Ladda regler från localStorage om de finns
+      const saved = localStorage.getItem("importRules");
     }
-  }, [open]);
+  }, [open, fetchCategories, fetchSuppliers]);
   useEffect(() => {
     if (categories.length > 0 && !selectedCategory) {
       setSelectedCategory(categories[0].id);
@@ -104,30 +116,33 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   };
 
   // Regler
-  const [rules, setRules] = useState<Rule[]>([]);
   const [newRuleContains, setNewRuleContains] = useState("");
   const [newRuleCategory, setNewRuleCategory] = useState("");
   const [newRuleSupplier, setNewRuleSupplier] = useState("");
-  const [editRuleId, setEditRuleId] = useState<number | null>(null);
+  const [editRuleId, setEditRuleId] = useState<string | null>(null);
 
   const handleAddRule = () => {
     if (!newRuleContains.trim() || !newRuleCategory.trim() || !newRuleSupplier.trim()) return;
-    setRules(prev => [...prev, {
+    const newRule = {
       id: Date.now(),
       contains: newRuleContains.trim(),
       category: newRuleCategory.trim(),
       supplier: newRuleSupplier.trim()
-    }]);
+    };
+    addRule(newRule);
     setNewRuleContains("");
     setNewRuleCategory("");
     setNewRuleSupplier("");
+    setTimeout(() => {
+      localStorage.setItem("importRules", JSON.stringify([...rules, newRule]));
+    }, 100);
   };
-  const handleDeleteRule = (id: number) => {
-    setRules(prev => prev.filter(r => r.id !== id));
+  const handleDeleteRule = (id: string) => {
+    deleteRule(id);
     if (editRuleId === id) setEditRuleId(null);
   };
-  const handleEditRule = (id: number) => {
-    const rule = rules.find(r => r.id === id);
+  const handleEditRule = (id: string) => {
+      const rule = rules.find(r => r._id === id);
     if (rule) {
       setNewRuleContains(rule.contains);
       setNewRuleCategory(rule.category);
@@ -137,14 +152,12 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   };
   const handleSaveEditRule = () => {
     if (editRuleId === null) return;
-    setRules(prev => prev.map(r => r.id === editRuleId ? {
-      ...r,
-      contains: newRuleContains.trim(),
-      category: newRuleCategory.trim(),
-      supplier: newRuleSupplier.trim()
-    } : r));
     setEditRuleId(null);
     setNewRuleContains("");
+    setTimeout(() => {
+      // Spara nuvarande rules till localStorage
+      localStorage.setItem("importRules", JSON.stringify(rules));
+    }, 100);
   };
   // Applicera regler på rad
   const getCategoryForRow = (row: any) => {
@@ -222,6 +235,66 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     reader.readAsArrayBuffer(file);
   };
 
+  const [importing, setImporting] = useState(false);
+  const [importToast, setImportToast] = useState<string | null>(null);
+
+  // Dubblettkontroll: returnerar true om posten redan finns
+  const isDuplicate = (item: any, existing: any[]) => {
+    return existing.some(e =>
+      e.amount === item.amount &&
+      e.year === item.year &&
+      e.month === item.month &&
+      e.name?.trim().toLowerCase() === item.name?.trim().toLowerCase() &&
+      e.category === item.category &&
+      e.supplier === item.supplier
+    );
+  };
+
+  const handleImportSelected = async () => {
+    if (selectedRows.length === 0) return;
+    setImporting(true);
+    await fetchItems(); // Hämta senaste poster
+    try {
+      const items = selectedRows.map(idx => {
+        const row = csvData[idx];
+        return {
+          name: row[fieldMapping.description] || row["Beskrivning"] || "",
+          amount: Number(row[fieldMapping.amount] || row["Belopp"] || 0),
+          type: "expense",
+          category: selectedCategory,
+          supplier: selectedSupplier,
+          note: row[fieldMapping.reference] || row["Referens"] || "",
+          year: new Date(row[fieldMapping.date] || row["Datum"] || "").getFullYear() || new Date().getFullYear(),
+          month: new Date(row[fieldMapping.date] || row["Datum"] || "").getMonth() + 1 || new Date().getMonth() + 1,
+        };
+      });
+      let imported = 0;
+      let skipped = 0;
+      for (const item of items) {
+        if (isDuplicate(item, existingItems)) {
+          skipped++;
+          continue;
+        }
+        try {
+          await addEconomyItem(item);
+          imported++;
+        } catch (err: any) {
+          setImportToast("Import misslyckades: " + (err?.response?.data?.message || err.message));
+          setImporting(false);
+          return;
+        }
+      }
+      setImportToast(`Import klar! ${imported} importerade, ${skipped} dubletter hoppades över.`);
+      setSelectedRows([]);
+      setCsvData([]);
+      setCsvHeaders([]);
+      setFieldMapping({});
+    } catch (err: any) {
+      setImportToast("Import misslyckades: " + (err?.response?.data?.message || err.message));
+    }
+    setImporting(false);
+  };
+
   if (!open) return null;
 
   // Stäng modal om man klickar på overlay
@@ -230,6 +303,9 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
       onClose();
     }
   };
+
+  // Rätta regel-UI: knappen aktiv om fält är ifyllda
+  const canAddRule = newRuleContains.trim() && selectedCategory && selectedSupplier;
 
   return (
     <div
@@ -264,15 +340,15 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
               <div className="font-semibold mb-2 text-sm">Regler för beskrivningsmatchning:</div>
               <div className="flex flex-col gap-2 mb-2">
                 {rules.map(rule => (
-                  <div key={rule.id} className="flex items-center gap-2 text-xs">
+                  <div key={rule._id} className="flex items-center gap-2 text-xs">
                     <span>Om beskrivning innehåller</span>
                     <span className="px-2 py-1 bg-white border rounded">{rule.contains}</span>
                     <span>→ kategori</span>
                     <span className="px-2 py-1 bg-white border rounded">{rule.category}</span>
                     <span>Leverantör:</span>
                     <span className="px-2 py-1 bg-white border rounded">{rule.supplier}</span>
-                    <button className="text-blue-600 underline" onClick={() => handleEditRule(rule.id)}>Redigera</button>
-                    <button className="text-red-600 underline" onClick={() => handleDeleteRule(rule.id)}>Ta bort</button>
+                    <button className="text-blue-600 underline" onClick={() => handleEditRule(rule._id!)}>Redigera</button>
+                    <button className="text-red-600 underline" onClick={() => handleDeleteRule(rule._id!)}>Ta bort</button>
                   </div>
                 ))}
               </div>
@@ -289,8 +365,8 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 <div className="flex items-center gap-1">
                   <select
                     className="border rounded px-2 py-1"
-                    value={selectedCategory}
-                    onChange={e => setSelectedCategory(e.target.value)}
+                    value={newRuleCategory}
+                    onChange={e => setNewRuleCategory(e.target.value)}
                   >
                     <option value="">Välj kategori</option>
                     {categories.map(cat => (
@@ -315,12 +391,12 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 <div className="flex items-center gap-1">
                   <select
                     className="border rounded px-2 py-1"
-                    value={selectedSupplier}
-                    onChange={e => setSelectedSupplier(e.target.value)}
-                    disabled={!selectedCategory}
+                    value={newRuleSupplier}
+                    onChange={e => setNewRuleSupplier(e.target.value)}
+                    disabled={!newRuleCategory}
                   >
                     <option value="">Välj leverantör</option>
-                    {suppliers.filter(sup => sup.categoryId === selectedCategory).map(sup => (
+                    {suppliers.filter(sup => sup.categoryId === newRuleCategory).map(sup => (
                       <option key={sup.id} value={sup.id}>{sup.name}</option>
                     ))}
                   </select>
@@ -334,12 +410,18 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   <button
                     className="px-2 py-1 bg-blue-600 text-white rounded"
                     onClick={handleCreateSupplier}
-                    disabled={!newSupplier.trim() || !selectedCategory}
+                    disabled={!newSupplier.trim() || !newRuleCategory}
                   >+
                   </button>
                 </div>
                 {editRuleId === null ? (
-                  <button className="px-2 py-1 bg-blue-600 text-white rounded" onClick={handleAddRule}>Lägg till regel</button>
+                  <button
+                    className="px-2 py-1 bg-blue-600 text-white rounded"
+                    onClick={handleAddRule}
+                    disabled={!newRuleContains.trim() || !newRuleCategory || !newRuleSupplier}
+                  >
+                    Lägg till regel
+                  </button>
                 ) : (
                   <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={handleSaveEditRule}>Spara ändring</button>
                 )}
@@ -364,22 +446,58 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {csvData.map((row, i) => (
-                    <tr key={i}>
-                      <td className="border px-2 py-1 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.includes(i)}
-                          onChange={() => handleSelectRow(i)}
-                        />
-                      </td>
-                      {csvHeaders.map((col) => (
-                        <td key={col} className="border px-2 py-1">{row[col]}</td>
-                      ))}
-                      <td className="border px-2 py-1 font-semibold text-blue-700">{getCategoryForRow(row)}</td>
-                      <td className="border px-2 py-1 font-semibold text-blue-700">{getSupplierForRow(row)}</td>
-                    </tr>
-                  ))}
+                  {csvData.map((row, i) => {
+                    // Applicera regler på previewItem
+                    const ruleCategory = getCategoryForRow(row);
+                    const ruleSupplier = getSupplierForRow(row);
+                    const previewItem = {
+                      name: row[fieldMapping.description] || row["Beskrivning"] || "",
+                      amount: Number(row[fieldMapping.amount] || row["Belopp"] || 0),
+                      type: "expense",
+                      category: ruleCategory || selectedCategory,
+                      supplier: ruleSupplier || selectedSupplier,
+                      note: row[fieldMapping.reference] || row["Referens"] || "",
+                      year: new Date(row[fieldMapping.date] || row["Datum"] || "").getFullYear() || new Date().getFullYear(),
+                      month: new Date(row[fieldMapping.date] || row["Datum"] || "").getMonth() + 1 || new Date().getMonth() + 1,
+                    };
+                    // Hitta matchande regel
+                    const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
+                    const desc = descCol ? row[descCol] || "" : "";
+                    const matchedRule = rules.find(rule => desc.toLowerCase().includes(rule.contains.toLowerCase()));
+                    const matchesRule = !!matchedRule;
+                    const duplicate = isDuplicate(previewItem, existingItems) && !matchesRule;
+                    return (
+                      <tr key={i} className={
+                        duplicate ? "bg-gray-200" : matchesRule ? "bg-blue-50" : ""
+                      }>
+                        <td className="border px-2 py-1 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.includes(i)}
+                            onChange={() => handleSelectRow(i)}
+                            disabled={duplicate}
+                          />
+                        </td>
+                        {csvHeaders.map((col) => (
+                          <td key={col} className="border px-2 py-1">{row[col]}</td>
+                        ))}
+                        <td className="border px-2 py-1 font-semibold text-blue-700">{ruleCategory}</td>
+                        <td className="border px-2 py-1 font-semibold text-blue-700">{ruleSupplier}</td>
+                        <td className="border px-2 py-1 text-xs">
+                          {matchedRule && (
+                            <span className="inline-flex items-center gap-1 text-blue-700">
+                              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" className="inline mr-1"><circle cx="10" cy="10" r="8" /></svg>
+                              Regel: <span className="font-mono bg-blue-100 px-1 rounded">{matchedRule.contains}</span>
+                              <span className="ml-1">→</span>
+                              <span className="font-semibold">{matchedRule.category}</span>
+                              <span className="ml-1">/</span>
+                              <span className="font-semibold">{matchedRule.supplier}</span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -390,12 +508,17 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
               <button
                 type="button"
                 className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700"
-                onClick={() => {/* importlogik här */}}
+                onClick={handleImportSelected}
                 disabled={Object.values(fieldMapping).filter(Boolean).length < 3 || selectedRows.length === 0}
               >
-                Importera markerade fält
+                {importing ? "Importerar..." : "Importera markerade fält"}
               </button>
             </div>
+            {importToast && (
+              <div className="mb-4 p-2 rounded bg-green-50 text-green-700 text-sm">
+                {importToast}
+              </div>
+            )}
           </div>
         )}
         <div className="flex gap-2 justify-end mt-6">
