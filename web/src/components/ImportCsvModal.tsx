@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import Papa from "papaparse";
+import { decode } from "iconv-lite-umd";
 
 interface ImportCsvModalProps {
   open: boolean;
@@ -8,8 +9,9 @@ interface ImportCsvModalProps {
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [csvRows, setCsvRows] = useState<any[]>([]);
-  const [csvError, setCsvError] = useState<string>("");
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
 
   if (!open) return null;
 
@@ -24,46 +26,58 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      // Dela upp i rader
-      const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-      // Hitta första raden med flest fält (troligen header)
-      let headerLineIdx = 0;
-      let maxFields = 0;
-      lines.forEach((line, idx) => {
-        const fields = line.split(",");
-        if (fields.length > maxFields) {
-          maxFields = fields.length;
-          headerLineIdx = idx;
-        }
-      });
-      // Skapa en ny text med bara header och data
-      const cleanText = lines.slice(headerLineIdx).join("\n");
-      Papa.parse(cleanText, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (result) => {
-          if (result.errors.length) {
-            setCsvError("Fel vid läsning av CSV: " + result.errors[0].message);
-            setCsvRows([]);
-          } else {
-            setCsvRows(result.data as any[]);
-            setCsvError("");
+    reader.onload = (event) => {
+      try {
+        // Läs som ArrayBuffer och konvertera från Windows-1252 (ANSI)
+        const buffer = event.target?.result as ArrayBuffer;
+        const uint8 = new Uint8Array(buffer);
+        const text = decode(uint8, "windows-1252");
+
+        // Hitta första raden med flest fält (troligen header)
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+        let headerLineIdx = 0;
+        let maxFields = 0;
+        lines.forEach((line, idx) => {
+          const fields = line.split(",");
+          if (fields.length > maxFields) {
+            maxFields = fields.length;
+            headerLineIdx = idx;
           }
-        },
-        error: (err) => {
-          setCsvError("Fel vid läsning av CSV: " + err.message);
-          setCsvRows([]);
+        });
+        // Skapa en ny text med bara header och data
+        const cleanText = lines.slice(headerLineIdx).join("\n");
+
+        const parsed = Papa.parse(cleanText, {
+          header: true,
+          skipEmptyLines: true,
+        });
+        if (parsed.errors.length > 0) {
+          setCsvError("Fel vid tolkning av CSV: " + parsed.errors[0].message);
+          setCsvData([]);
+          setCsvHeaders([]);
+        } else {
+          setCsvError(null);
+          setCsvData(parsed.data as any[]);
+          setCsvHeaders(parsed.meta.fields || []);
         }
-      });
+      } catch (err) {
+        setCsvError("Fel vid uppladdning av fil.");
+        setCsvData([]);
+        setCsvHeaders([]);
+      }
     };
-    reader.readAsText(file, 'utf-8');
+    reader.readAsArrayBuffer(file);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40" onClick={handleOverlayClick}>
-      <div className="bg-white dark:bg-slate-900 rounded shadow-lg p-8 w-full max-w-5xl relative overflow-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-lg p-8 w-full max-w-5xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-xl font-semibold mb-4">Importera transaktioner från CSV</h2>
         <input
           ref={fileInputRef}
@@ -73,20 +87,20 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
           onChange={handleFileChange}
         />
         {csvError && <div className="text-red-600 mb-2">{csvError}</div>}
-        {csvRows.length > 0 && (
+        {csvData.length > 0 && (
           <div className="overflow-auto max-h-96 mb-4">
             <table className="w-full text-sm border">
               <thead>
                 <tr>
-                  {Object.keys(csvRows[0]).map((col) => (
+                  {csvHeaders.map((col) => (
                     <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {csvRows.map((row, i) => (
+                {csvData.map((row, i) => (
                   <tr key={i}>
-                    {Object.keys(row).map((col) => (
+                    {csvHeaders.map((col) => (
                       <td key={col} className="border px-2 py-1">{row[col]}</td>
                     ))}
                   </tr>

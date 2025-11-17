@@ -10,6 +10,8 @@
   "dependencies": {
     "axios": "^1.6.7",
     "framer-motion": "^10.16.3",
+    "iconv-lite": "^0.7.0",
+    "iconv-lite-umd": "^0.6.10",
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
