@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
+import { useCategoryStore } from "../store/useCategoryStore";
+import { useSupplierStore } from "../store/useSupplierStore";
 import Papa from "papaparse";
-import { categoryApi } from "../api/categoryApi";
-import { supplierApi } from "../api/supplierApi";
 import { decode } from "iconv-lite-umd";
 
 interface Rule {
@@ -17,9 +17,11 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
-  // Backend-data
-  const [categories, setCategories] = useState<string[]>([]);
-  const [suppliers, setSuppliers] = useState<string[]>([]);
+  // Zustand stores
+  const { categories, addCategory, fetchCategories } = useCategoryStore();
+  const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [newCategory, setNewCategory] = useState("");
   const [newSupplier, setNewSupplier] = useState("");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -27,26 +29,40 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
 
   useEffect(() => {
     if (open) {
-      categoryApi.getCategories().then((data) => setCategories(data.map((c: any) => c.name)));
-      supplierApi.getSuppliers().then((data) => setSuppliers(data.map((s: any) => s.name)));
+      fetchCategories();
+      fetchSuppliers();
     }
   }, [open]);
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories]);
+  useEffect(() => {
+    if (suppliers.length > 0 && !selectedSupplier) {
+      setSelectedSupplier(suppliers[0].id);
+    }
+  }, [suppliers]);
 
   const handleCreateCategory = async () => {
     if (!newCategory.trim()) return;
-    setIsCreatingCategory(true);
-    await categoryApi.createCategory(newCategory.trim());
-    const updated = await categoryApi.getCategories();
-    setCategories(updated.map((c: any) => c.name));
+    await addCategory(newCategory.trim());
+    await fetchCategories();
+    setTimeout(() => {
+      const found = categories.find(c => c.name === newCategory.trim());
+      if (found) setSelectedCategory(found.id);
+    }, 100);
     setNewCategory("");
-    setIsCreatingCategory(false);
   };
   const handleCreateSupplier = async () => {
-    if (!newSupplier.trim()) return;
+    if (!newSupplier.trim() || !selectedCategory) return;
     setIsCreatingSupplier(true);
-    await supplierApi.createSupplier(newSupplier.trim(), "");
-    const updated = await supplierApi.getSuppliers();
-    setSuppliers(updated.map((s: any) => s.name));
+    await addSupplier(newSupplier.trim(), selectedCategory);
+    await fetchSuppliers();
+    setTimeout(() => {
+      const found = suppliers.find(s => s.name === newSupplier.trim() && s.categoryId === selectedCategory);
+      if (found) setSelectedSupplier(found.id);
+    }, 100);
     setNewSupplier("");
     setIsCreatingSupplier(false);
   };
@@ -129,10 +145,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     } : r));
     setEditRuleId(null);
     setNewRuleContains("");
-    setNewRuleCategory("");
-    setNewRuleSupplier("");
   };
-
   // Applicera regler på rad
   const getCategoryForRow = (row: any) => {
     const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
@@ -155,19 +168,16 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     return "";
   };
 
-  // CSV-filuppladdning
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         // Läs som ArrayBuffer och konvertera från Windows-1252 (ANSI)
         const buffer = event.target?.result as ArrayBuffer;
-        const uint8 = new Uint8Array(buffer);
-        const text = decode(uint8, "windows-1252");
-        // Hitta första raden med flest fält (troligen header)
-        const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+        const text = decode(new Uint8Array(buffer), "windows-1252");
+        const lines = text.split(/\r\n|\n/);
         let headerIdx = 0;
         let maxFields = 0;
         lines.forEach((line, idx) => {
@@ -279,12 +289,12 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 <div className="flex items-center gap-1">
                   <select
                     className="border rounded px-2 py-1"
-                    value={newRuleCategory}
-                    onChange={e => setNewRuleCategory(e.target.value)}
+                    value={selectedCategory}
+                    onChange={e => setSelectedCategory(e.target.value)}
                   >
                     <option value="">Välj kategori</option>
                     {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
                   <input
@@ -297,7 +307,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   <button
                     className="px-2 py-1 bg-blue-600 text-white rounded"
                     onClick={handleCreateCategory}
-                    disabled={isCreatingCategory || !newCategory.trim()}
+                    disabled={!newCategory.trim()}
                   >+
                   </button>
                 </div>
@@ -305,12 +315,13 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                 <div className="flex items-center gap-1">
                   <select
                     className="border rounded px-2 py-1"
-                    value={newRuleSupplier}
-                    onChange={e => setNewRuleSupplier(e.target.value)}
+                    value={selectedSupplier}
+                    onChange={e => setSelectedSupplier(e.target.value)}
+                    disabled={!selectedCategory}
                   >
                     <option value="">Välj leverantör</option>
-                    {suppliers.map(sup => (
-                      <option key={sup} value={sup}>{sup}</option>
+                    {suppliers.filter(sup => sup.categoryId === selectedCategory).map(sup => (
+                      <option key={sup.id} value={sup.id}>{sup.name}</option>
                     ))}
                   </select>
                   <input
@@ -323,7 +334,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   <button
                     className="px-2 py-1 bg-blue-600 text-white rounded"
                     onClick={handleCreateSupplier}
-                    disabled={isCreatingSupplier || !newSupplier.trim()}
+                    disabled={!newSupplier.trim() || !selectedCategory}
                   >+
                   </button>
                 </div>

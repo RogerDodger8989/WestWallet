@@ -13,7 +13,7 @@ interface SupplierState {
   error: string;
   selectedSupplier?: string;
   fetchSuppliers: () => Promise<void>;
-  addSupplier: (name: string) => Promise<void>;
+  addSupplier: (name: string, categoryId: string) => Promise<void>;
 }
 
 export const useSupplierStore = create<SupplierState>((set, get) => ({
@@ -40,10 +40,10 @@ export const useSupplierStore = create<SupplierState>((set, get) => ({
       set({ error: error.message || 'Kunde inte hämta leverantörer', loading: false });
     }
   },
-  addSupplier: async (name) => {
+    addSupplier: async (name, categoryId) => {
     set({ loading: true, error: '' });
     try {
-      const res = await supplierApi.createSupplier(name);
+        const res = await supplierApi.createSupplier(name, categoryId);
       if (res.statusCode === 400) {
         set({ error: res.message || 'Dublettleverantör', loading: false });
         return;
