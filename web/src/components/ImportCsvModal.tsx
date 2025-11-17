@@ -8,6 +8,54 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
+    // Regler: [{ id, contains, category }]
+    const [rules, setRules] = useState<Array<{ id: number; contains: string; category: string }>>([]);
+    const [newRuleContains, setNewRuleContains] = useState("");
+    const [newRuleCategory, setNewRuleCategory] = useState("");
+    const [editRuleId, setEditRuleId] = useState<number | null>(null);
+
+    // Lägg till ny regel
+    const handleAddRule = () => {
+      if (!newRuleContains.trim() || !newRuleCategory.trim()) return;
+      setRules(prev => [...prev, { id: Date.now(), contains: newRuleContains.trim(), category: newRuleCategory.trim() }]);
+      setNewRuleContains("");
+      setNewRuleCategory("");
+    };
+
+    // Ta bort regel
+    const handleDeleteRule = (id: number) => {
+      setRules(prev => prev.filter(r => r.id !== id));
+      if (editRuleId === id) setEditRuleId(null);
+    };
+
+    // Redigera regel
+    const handleEditRule = (id: number) => {
+      const rule = rules.find(r => r.id === id);
+      if (rule) {
+        setNewRuleContains(rule.contains);
+        setNewRuleCategory(rule.category);
+        setEditRuleId(id);
+      }
+    };
+    const handleSaveEditRule = () => {
+      if (editRuleId === null) return;
+      setRules(prev => prev.map(r => r.id === editRuleId ? { ...r, contains: newRuleContains.trim(), category: newRuleCategory.trim() } : r));
+      setEditRuleId(null);
+      setNewRuleContains("");
+      setNewRuleCategory("");
+    };
+
+    // Applicera regler på rad
+    const getCategoryForRow = (row: any) => {
+      const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
+      const desc = descCol ? row[descCol] || "" : "";
+      for (const rule of rules) {
+        if (desc.toLowerCase().includes(rule.contains.toLowerCase())) {
+          return rule.category;
+        }
+      }
+      return "";
+    };
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   const handleSelectRow = (idx: number) => {
@@ -152,25 +200,43 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
         {csvError && <div className="text-red-600 mb-2">{csvError}</div>}
         {csvData.length > 0 && (
           <div>
-            <div className="mb-4 p-2 border rounded bg-gray-50">
-              {/* Fältmappning UI */}
-              <div className="font-semibold mb-2 text-sm">Mappa CSV-kolumner till interna fält:</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {csvHeaders.map((col) => (
-                  <div key={col} className="flex items-center gap-2 text-xs">
-                    <span className="w-40 truncate" title={col}>{col}</span>
-                    <select
-                      className="border rounded px-2 py-1"
-                      value={fieldMapping[col] || ""}
-                      onChange={e => handleMappingChange(col, e.target.value)}
-                    >
-                      <option value="">Ingen mappning</option>
-                      {internalFields.map(f => (
-                        <option key={f.key} value={f.key}>{f.label}</option>
-                      ))}
-                    </select>
+            {/* Regler UI */}
+            <div className="mb-4 p-2 border rounded bg-blue-50">
+              <div className="font-semibold mb-2 text-sm">Regler för beskrivningsmatchning:</div>
+              <div className="flex flex-col gap-2 mb-2">
+                {rules.map(rule => (
+                  <div key={rule.id} className="flex items-center gap-2 text-xs">
+                    <span>Om beskrivning innehåller</span>
+                    <span className="px-2 py-1 bg-white border rounded">{rule.contains}</span>
+                    <span>→ kategori</span>
+                    <span className="px-2 py-1 bg-white border rounded">{rule.category}</span>
+                    <button className="text-blue-600 underline" onClick={() => handleEditRule(rule.id)}>Redigera</button>
+                    <button className="text-red-600 underline" onClick={() => handleDeleteRule(rule.id)}>Ta bort</button>
                   </div>
                 ))}
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span>Om beskrivning innehåller</span>
+                <input
+                  type="text"
+                  className="border rounded px-2 py-1"
+                  value={newRuleContains}
+                  onChange={e => setNewRuleContains(e.target.value)}
+                  placeholder="t.ex. Swish"
+                />
+                <span>→ kategori</span>
+                <input
+                  type="text"
+                  className="border rounded px-2 py-1"
+                  value={newRuleCategory}
+                  onChange={e => setNewRuleCategory(e.target.value)}
+                  placeholder="t.ex. Swish"
+                />
+                {editRuleId === null ? (
+                  <button className="px-2 py-1 bg-blue-600 text-white rounded" onClick={handleAddRule}>Lägg till regel</button>
+                ) : (
+                  <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={handleSaveEditRule}>Spara ändring</button>
+                )}
               </div>
             </div>
             <div className="overflow-auto max-h-96 mb-4">
@@ -187,6 +253,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                     {csvHeaders.map((col) => (
                       <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
                     ))}
+                    <th className="border px-2 py-1 bg-gray-100">Kategori (regel)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,6 +269,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                       {csvHeaders.map((col) => (
                         <td key={col} className="border px-2 py-1">{row[col]}</td>
                       ))}
+                      <td className="border px-2 py-1 font-semibold text-blue-700">{getCategoryForRow(row)}</td>
                     </tr>
                   ))}
                 </tbody>
