@@ -1,6 +1,15 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Papa from "papaparse";
+import { categoryApi } from "../api/categoryApi";
+import { supplierApi } from "../api/supplierApi";
 import { decode } from "iconv-lite-umd";
+
+interface Rule {
+  id: number;
+  contains: string;
+  category: string;
+  supplier: string;
+}
 
 interface ImportCsvModalProps {
   open: boolean;
@@ -8,62 +17,68 @@ interface ImportCsvModalProps {
 }
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
-    // Regler: [{ id, contains, category }]
-    const [rules, setRules] = useState<Array<{ id: number; contains: string; category: string }>>([]);
-    const [newRuleContains, setNewRuleContains] = useState("");
-    const [newRuleCategory, setNewRuleCategory] = useState("");
-    const [editRuleId, setEditRuleId] = useState<number | null>(null);
+  // Backend-data
+  const [categories, setCategories] = useState<string[]>([]);
+  const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState("");
+  const [newSupplier, setNewSupplier] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
 
-    // Lägg till ny regel
-    const handleAddRule = () => {
-      if (!newRuleContains.trim() || !newRuleCategory.trim()) return;
-      setRules(prev => [...prev, { id: Date.now(), contains: newRuleContains.trim(), category: newRuleCategory.trim() }]);
-      setNewRuleContains("");
-      setNewRuleCategory("");
-    };
+  useEffect(() => {
+    if (open) {
+      categoryApi.getCategories().then((data) => setCategories(data.map((c: any) => c.name)));
+      supplierApi.getSuppliers().then((data) => setSuppliers(data.map((s: any) => s.name)));
+    }
+  }, [open]);
 
-    // Ta bort regel
-    const handleDeleteRule = (id: number) => {
-      setRules(prev => prev.filter(r => r.id !== id));
-      if (editRuleId === id) setEditRuleId(null);
-    };
+  const handleCreateCategory = async () => {
+    if (!newCategory.trim()) return;
+    setIsCreatingCategory(true);
+    await categoryApi.createCategory(newCategory.trim());
+    const updated = await categoryApi.getCategories();
+    setCategories(updated.map((c: any) => c.name));
+    setNewCategory("");
+    setIsCreatingCategory(false);
+  };
+  const handleCreateSupplier = async () => {
+    if (!newSupplier.trim()) return;
+    setIsCreatingSupplier(true);
+    await supplierApi.createSupplier(newSupplier.trim(), "");
+    const updated = await supplierApi.getSuppliers();
+    setSuppliers(updated.map((s: any) => s.name));
+    setNewSupplier("");
+    setIsCreatingSupplier(false);
+  };
 
-    // Redigera regel
-    const handleEditRule = (id: number) => {
-      const rule = rules.find(r => r.id === id);
-      if (rule) {
-        setNewRuleContains(rule.contains);
-        setNewRuleCategory(rule.category);
-        setEditRuleId(id);
-      }
-    };
-    const handleSaveEditRule = () => {
-      if (editRuleId === null) return;
-      setRules(prev => prev.map(r => r.id === editRuleId ? { ...r, contains: newRuleContains.trim(), category: newRuleCategory.trim() } : r));
-      setEditRuleId(null);
-      setNewRuleContains("");
-      setNewRuleCategory("");
-    };
+  // Fältmappning
+  const internalFields = [
+    { key: "date", label: "Datum" },
+    { key: "amount", label: "Belopp" },
+    { key: "description", label: "Beskrivning" },
+    { key: "reference", label: "Referens" },
+    { key: "account", label: "Kontonummer" },
+    { key: "currency", label: "Valuta" },
+  ];
+  const [fieldMapping, setFieldMapping] = useState<{ [csvCol: string]: string }>({});
+  const handleMappingChange = (csvCol: string, internalKey: string) => {
+    setFieldMapping((prev) => ({ ...prev, [csvCol]: internalKey }));
+  };
 
-    // Applicera regler på rad
-    const getCategoryForRow = (row: any) => {
-      const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
-      const desc = descCol ? row[descCol] || "" : "";
-      for (const rule of rules) {
-        if (desc.toLowerCase().includes(rule.contains.toLowerCase())) {
-          return rule.category;
-        }
-      }
-      return "";
-    };
+  // CSV
+  const [headerLineIdx, setHeaderLineIdx] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+
+  // Markering av rader
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
-
   const handleSelectRow = (idx: number) => {
     setSelectedRows((prev) =>
       prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
     );
   };
-
   const handleSelectAll = () => {
     if (csvData.length === selectedRows.length) {
       setSelectedRows([]);
@@ -72,50 +87,75 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     }
   };
 
-        const handleImport = () => {
-          // Extrahera mappade fält från markerade rader
-          const mapped = selectedRows.map(idx => {
-            const row = csvData[idx];
-            return {
-              month: row[Object.keys(fieldMapping).find(k => fieldMapping[k] === "date") || ""] || "",
-              name: row[Object.keys(fieldMapping).find(k => fieldMapping[k] === "description") || ""] || "",
-              amount: row[Object.keys(fieldMapping).find(k => fieldMapping[k] === "amount") || ""] || "",
-            };
-          });
-          // Här kan du skicka mapped till backend eller vidare i appen
-          alert(`Importerar ${mapped.length} transaktioner!`);
-          onClose();
-        };
-      // För fältmappning
-      const internalFields = [
-        { key: "date", label: "Datum" },
-        { key: "amount", label: "Belopp" },
-        { key: "description", label: "Beskrivning" },
-        { key: "reference", label: "Referens" },
-        { key: "account", label: "Kontonummer" },
-        { key: "currency", label: "Valuta" },
-        // Lägg till fler vid behov
-      ];
-      const [fieldMapping, setFieldMapping] = useState<{ [csvCol: string]: string }>({});
+  // Regler
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [newRuleContains, setNewRuleContains] = useState("");
+  const [newRuleCategory, setNewRuleCategory] = useState("");
+  const [newRuleSupplier, setNewRuleSupplier] = useState("");
+  const [editRuleId, setEditRuleId] = useState<number | null>(null);
 
-      const handleMappingChange = (csvCol: string, internalKey: string) => {
-        setFieldMapping((prev) => ({ ...prev, [csvCol]: internalKey }));
-      };
-    const [headerLineIdx, setHeaderLineIdx] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [csvData, setCsvData] = useState<any[]>([]);
-  const [csvError, setCsvError] = useState<string | null>(null);
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-
-  if (!open) return null;
-
-  // Stäng modal om man klickar på overlay
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
+  const handleAddRule = () => {
+    if (!newRuleContains.trim() || !newRuleCategory.trim() || !newRuleSupplier.trim()) return;
+    setRules(prev => [...prev, {
+      id: Date.now(),
+      contains: newRuleContains.trim(),
+      category: newRuleCategory.trim(),
+      supplier: newRuleSupplier.trim()
+    }]);
+    setNewRuleContains("");
+    setNewRuleCategory("");
+    setNewRuleSupplier("");
+  };
+  const handleDeleteRule = (id: number) => {
+    setRules(prev => prev.filter(r => r.id !== id));
+    if (editRuleId === id) setEditRuleId(null);
+  };
+  const handleEditRule = (id: number) => {
+    const rule = rules.find(r => r.id === id);
+    if (rule) {
+      setNewRuleContains(rule.contains);
+      setNewRuleCategory(rule.category);
+      setNewRuleSupplier(rule.supplier || "");
+      setEditRuleId(id);
     }
   };
+  const handleSaveEditRule = () => {
+    if (editRuleId === null) return;
+    setRules(prev => prev.map(r => r.id === editRuleId ? {
+      ...r,
+      contains: newRuleContains.trim(),
+      category: newRuleCategory.trim(),
+      supplier: newRuleSupplier.trim()
+    } : r));
+    setEditRuleId(null);
+    setNewRuleContains("");
+    setNewRuleCategory("");
+    setNewRuleSupplier("");
+  };
 
+  // Applicera regler på rad
+  const getCategoryForRow = (row: any) => {
+    const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
+    const desc = descCol ? row[descCol] || "" : "";
+    for (const rule of rules) {
+      if (desc.toLowerCase().includes(rule.contains.toLowerCase())) {
+        return rule.category;
+      }
+    }
+    return "";
+  };
+  const getSupplierForRow = (row: any) => {
+    const descCol = Object.keys(fieldMapping).find(k => fieldMapping[k] === "description");
+    const desc = descCol ? row[descCol] || "" : "";
+    for (const rule of rules) {
+      if (desc.toLowerCase().includes(rule.contains.toLowerCase())) {
+        return rule.supplier;
+      }
+    }
+    return "";
+  };
+
+  // CSV-filuppladdning
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -126,7 +166,6 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
         const buffer = event.target?.result as ArrayBuffer;
         const uint8 = new Uint8Array(buffer);
         const text = decode(uint8, "windows-1252");
-
         // Hitta första raden med flest fält (troligen header)
         const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
         let headerIdx = 0;
@@ -138,10 +177,8 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
             headerIdx = idx;
           }
         });
-        setHeaderLineIdx(headerIdx + 1); // Visa 1-baserad radnummer
-        // Skapa en ny text med bara header och data
+        setHeaderLineIdx(headerIdx + 1);
         const cleanText = lines.slice(headerIdx).join("\n");
-
         const parsed = Papa.parse(cleanText, {
           header: true,
           skipEmptyLines: true,
@@ -154,10 +191,10 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
         } else {
           setCsvError(null);
           setCsvData(parsed.data as any[]);
-          setCsvHeaders(parsed.meta.fields || []);
+          setCsvHeaders((parsed.meta.fields || []) as string[]);
           // Automatisk fältmappning
           const autoMap: { [csvCol: string]: string } = {};
-          (parsed.meta.fields || []).forEach(col => {
+          (parsed.meta.fields || []).forEach((col: string) => {
             if (col.toLowerCase().includes("transaktionsdag")) autoMap[col] = "date";
             else if (col.toLowerCase().includes("beskrivning")) autoMap[col] = "description";
             else if (col.toLowerCase().includes("belopp")) autoMap[col] = "amount";
@@ -175,6 +212,15 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     reader.readAsArrayBuffer(file);
   };
 
+  if (!open) return null;
+
+  // Stäng modal om man klickar på overlay
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
@@ -185,18 +231,21 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-xl font-semibold mb-4">Importera transaktioner från CSV</h2>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          className="mb-4"
-          onChange={handleFileChange}
-        />
-          {headerLineIdx && csvHeaders.length > 0 && (
-            <div className="text-xs text-gray-600 mb-2">
-              Header-rad identifierad: Rad {headerLineIdx} – {csvHeaders.join(", ")}
-            </div>
-          )}
+          <label className="inline-block mb-4">
+            <span className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 cursor-pointer inline-block">Välj fil</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </label>
+        {headerLineIdx && csvHeaders.length > 0 && (
+          <div className="text-xs text-gray-600 mb-2">
+            Header-rad identifierad: Rad {headerLineIdx} – {csvHeaders.join(", ")}
+          </div>
+        )}
         {csvError && <div className="text-red-600 mb-2">{csvError}</div>}
         {csvData.length > 0 && (
           <div>
@@ -210,6 +259,8 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                     <span className="px-2 py-1 bg-white border rounded">{rule.contains}</span>
                     <span>→ kategori</span>
                     <span className="px-2 py-1 bg-white border rounded">{rule.category}</span>
+                    <span>Leverantör:</span>
+                    <span className="px-2 py-1 bg-white border rounded">{rule.supplier}</span>
                     <button className="text-blue-600 underline" onClick={() => handleEditRule(rule.id)}>Redigera</button>
                     <button className="text-red-600 underline" onClick={() => handleDeleteRule(rule.id)}>Ta bort</button>
                   </div>
@@ -225,13 +276,57 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   placeholder="t.ex. Swish"
                 />
                 <span>→ kategori</span>
-                <input
-                  type="text"
-                  className="border rounded px-2 py-1"
-                  value={newRuleCategory}
-                  onChange={e => setNewRuleCategory(e.target.value)}
-                  placeholder="t.ex. Swish"
-                />
+                <div className="flex items-center gap-1">
+                  <select
+                    className="border rounded px-2 py-1"
+                    value={newRuleCategory}
+                    onChange={e => setNewRuleCategory(e.target.value)}
+                  >
+                    <option value="">Välj kategori</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    className="border rounded px-2 py-1 w-24"
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value)}
+                    placeholder="Ny kategori"
+                  />
+                  <button
+                    className="px-2 py-1 bg-blue-600 text-white rounded"
+                    onClick={handleCreateCategory}
+                    disabled={isCreatingCategory || !newCategory.trim()}
+                  >+
+                  </button>
+                </div>
+                <span>Leverantör:</span>
+                <div className="flex items-center gap-1">
+                  <select
+                    className="border rounded px-2 py-1"
+                    value={newRuleSupplier}
+                    onChange={e => setNewRuleSupplier(e.target.value)}
+                  >
+                    <option value="">Välj leverantör</option>
+                    {suppliers.map(sup => (
+                      <option key={sup} value={sup}>{sup}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    className="border rounded px-2 py-1 w-24"
+                    value={newSupplier}
+                    onChange={e => setNewSupplier(e.target.value)}
+                    placeholder="Ny leverantör"
+                  />
+                  <button
+                    className="px-2 py-1 bg-blue-600 text-white rounded"
+                    onClick={handleCreateSupplier}
+                    disabled={isCreatingSupplier || !newSupplier.trim()}
+                  >+
+                  </button>
+                </div>
                 {editRuleId === null ? (
                   <button className="px-2 py-1 bg-blue-600 text-white rounded" onClick={handleAddRule}>Lägg till regel</button>
                 ) : (
@@ -254,6 +349,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                       <th key={col} className="border px-2 py-1 bg-gray-100 dark:bg-slate-800">{col}</th>
                     ))}
                     <th className="border px-2 py-1 bg-gray-100">Kategori (regel)</th>
+                    <th className="border px-2 py-1 bg-gray-100">Leverantör (regel)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -270,6 +366,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                         <td key={col} className="border px-2 py-1">{row[col]}</td>
                       ))}
                       <td className="border px-2 py-1 font-semibold text-blue-700">{getCategoryForRow(row)}</td>
+                      <td className="border px-2 py-1 font-semibold text-blue-700">{getSupplierForRow(row)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -282,7 +379,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
               <button
                 type="button"
                 className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700"
-                onClick={handleImport}
+                onClick={() => {/* importlogik här */}}
                 disabled={Object.values(fieldMapping).filter(Boolean).length < 3 || selectedRows.length === 0}
               >
                 Importera markerade fält
@@ -293,17 +390,10 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
         <div className="flex gap-2 justify-end mt-6">
           <button
             type="button"
-            className="px-4 py-2 bg-gray-300 rounded"
+            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
             onClick={onClose}
           >
-            Avbryt
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Välj fil
+            Stäng
           </button>
         </div>
       </div>
