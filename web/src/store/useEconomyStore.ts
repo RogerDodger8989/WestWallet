@@ -31,6 +31,7 @@ interface EconomyState {
   }) => Promise<void>;
   updateItem: (item: EconomyItem) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
+  restoreItem: (item: EconomyItem) => Promise<void>;
 }
 
 export const useEconomyStore = create<EconomyState>((set, get) => ({
@@ -71,6 +72,17 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
       set({ items: get().items.filter(i => i.id !== id), loading: false });
     } catch (err: any) {
       set({ error: err.message || 'Kunde inte radera post', loading: false });
+    }
+  },
+  restoreItem: async (item) => {
+    set({ loading: true, error: '' });
+    try {
+      // Skicka både id och _id till backend
+      const restorePayload = { ...item, _id: item.id };
+      const restored = await import('../api/economyApi').then(api => api.restoreEconomyItem(restorePayload));
+      set({ items: [...get().items, restored], loading: false });
+    } catch (err: any) {
+      set({ error: err.message || 'Kunde inte återställa post', loading: false });
     }
   },
 }));

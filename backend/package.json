@@ -444,6 +444,7 @@
     "type-fest": "^0.21.3",
     "type-is": "^2.0.1",
     "typedarray": "^0.0.6",
+    "typeorm": "^0.3.27",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
     "uglify-js": "^3.19.3",

@@ -1,3 +1,7 @@
+export async function restoreEconomyItem(item: EconomyItem): Promise<EconomyItem> {
+	const res = await axios.post(API_URL + '/restore', item);
+	return { ...res.data, id: res.data._id, displayId: res.data.displayId };
+}
 import axios from './axios';
 import { EconomyItem } from '../store/useEconomyStore';
 

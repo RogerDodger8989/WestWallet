@@ -26,6 +26,11 @@ export class ExpensesService {
       this.wsGateway?.sendEvent('dashboardStats', { year, stats });
       return stats;
     }
+  async restore(body: any): Promise<ExpenseDocument | null> {
+    // Exempel: återställ en post genom att sätta isDeleted = false
+    if (!body.id) throw new NotFoundException('ID saknas');
+    return this.expenseModel.findByIdAndUpdate(body.id, { isDeleted: false }, { new: true }).exec();
+  }
   constructor(
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
     @Inject(forwardRef(() => AuditLogService)) private readonly auditLogService: AuditLogService,

@@ -1,3 +1,4 @@
+
 import { Controller, Get, Post, Body, Param, Delete, Put, Query, Inject } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { Model } from 'mongoose';
@@ -10,6 +11,11 @@ export class ExpensesController {
     @Inject('WsGateway') private readonly wsGateway: any,
     @InjectModel('AuditLog') private readonly auditLogModel: Model<any>,
   ) {}
+
+  @Post('restore')
+  async restore(@Body() body: any) {
+    return this.expensesService.restore(body);
+  }
 
   // Offline sync: returnera ändrade poster sedan timestamp
   @Get('sync')
