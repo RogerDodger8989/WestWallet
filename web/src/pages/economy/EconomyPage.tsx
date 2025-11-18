@@ -237,8 +237,7 @@ const EconomyPage: React.FC = () => {
             Importera CSV
           </button>
         </div>
-          // State för importmodal
-          const [showImportModal, setShowImportModal] = useState(false);
+          
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
           e.preventDefault();
           if (!name || !amount || !type || !month || !selectedCategory || !selectedSupplier) {

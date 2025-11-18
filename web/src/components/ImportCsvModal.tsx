@@ -239,17 +239,24 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     // Prepare items to import
     const itemsToImport = selectedRows.map(i => {
       const row = csvData[i];
+      // Felsökning: logga referensfält och note
+      console.log('FELLOGG: row["Referens"]:', row["Referens"], 'fieldMapping.reference:', fieldMapping.reference, 'row[fieldMapping.reference]:', row[fieldMapping.reference]);
       // Find rule for row
       const matchedRule = getMatchedRule(row);
       const category = matchedRule?.category || selectedCategory || "okategoriserad";
       const supplier = matchedRule?.supplier || selectedSupplier || "okänd";
+      // Notering ska vara tom om referens är ignorerad
+      let note = "";
+      if (fieldMapping.reference && fieldMapping.reference !== "Ignorera" && row[fieldMapping.reference]) {
+        note = row[fieldMapping.reference];
+      }
       return {
         name: row[fieldMapping.description] || row["Beskrivning"] || "",
         amount: Number(row[fieldMapping.amount] || row["Belopp"] || 0),
         type: "expense",
         category,
         supplier,
-        note: row[fieldMapping.reference] || row["Referens"] || "",
+        note,
         year: new Date(row[fieldMapping.date] || row["Datum"] || "").getFullYear() || new Date().getFullYear(),
         month: new Date(row[fieldMapping.date] || row["Datum"] || "").getMonth() + 1 || new Date().getMonth() + 1,
       };
