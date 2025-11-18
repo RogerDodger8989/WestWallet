@@ -98,9 +98,10 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   const addSupplier = useSupplierStore(state => state.addSupplier);
 
   // No demo data: keep CSV empty until user uploads a file
-  // Economy store helper
+  // Economy store helpers
   const addItemToStore = useEconomyStore(state => state.addItem);
   const fetchEconomyItems = useEconomyStore(state => state.fetchItems);
+  const economyItems = useEconomyStore(state => state.items);
 
   // Automatisk fältmappning vid rubrikimport
   useEffect(() => {
@@ -155,16 +156,17 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     return rules.find(rule => desc.toLowerCase().includes(rule.contains.toLowerCase()));
   };
 
-  // Dubblettkontroll
-  const existingItems: { amount: number; date: string; description: string }[] = [];
+  // Dubblettkontroll mot economy
   const isDuplicate = (row: Record<string, any>) => {
+    // Bokfört saldo = amount, Beskrivning = description, Belopp = amount
     const desc = fieldMapping["description"] ? row[fieldMapping["description"]] : row["Beskrivning"] || "";
     const amount = fieldMapping["amount"] ? Number(row[fieldMapping["amount"]]) : Number(row["Belopp"] || 0);
-    const date = fieldMapping["date"] ? row[fieldMapping["date"]] : row["Datum"] || "";
-    return existingItems.some(item =>
-      item.amount === amount &&
-      item.date === date &&
-      item.description === desc
+    // Bokfört saldo: match mot economyItem.amount
+    // Beskrivning: match mot economyItem.name
+    // Belopp: match mot economyItem.amount
+    return economyItems.some(item =>
+      item.name === desc &&
+      item.amount === amount
     );
   };
 
@@ -176,12 +178,14 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
       const row = csvData[i];
       // Find rule for row
       const matchedRule = getMatchedRule(row);
+      const category = matchedRule?.category || selectedCategory || "okategoriserad";
+      const supplier = matchedRule?.supplier || selectedSupplier || "okänd";
       return {
         name: row[fieldMapping.description] || row["Beskrivning"] || "",
         amount: Number(row[fieldMapping.amount] || row["Belopp"] || 0),
         type: "expense",
-        category: matchedRule?.category || selectedCategory,
-        supplier: matchedRule?.supplier || selectedSupplier,
+        category,
+        supplier,
         note: row[fieldMapping.reference] || row["Referens"] || "",
         year: new Date(row[fieldMapping.date] || row["Datum"] || "").getFullYear() || new Date().getFullYear(),
         month: new Date(row[fieldMapping.date] || row["Datum"] || "").getMonth() + 1 || new Date().getMonth() + 1,
@@ -189,12 +193,19 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     });
     // Import via store so UI updates
     // Import each row and collect results
-    Promise.all(itemsToImport.map((item, idx) =>
-      addItemToStore(item)
-        .then(() => ({ row: selectedRows[idx], success: true }))
-        .catch(e => ({ row: selectedRows[idx], success: false, error: e?.message || 'Okänt fel' }))
-    )).then(async results => {
-      try { await fetchEconomyItems(); } catch {}
+    Promise.all(itemsToImport.map((item, idx) => {
+      console.log('Importerar rad', idx, item);
+      return addItemToStore(item)
+        .then((res) => {
+          console.log('API svar för rad', idx, res);
+          return { row: selectedRows[idx], success: true };
+        })
+        .catch(e => {
+          console.error('Fel vid import av rad', idx, e);
+          return { row: selectedRows[idx], success: false, error: e?.message || 'Okänt fel' };
+        });
+    })).then(async results => {
+      try { await fetchEconomyItems(); } catch (err) { console.error('Fel vid fetchEconomyItems', err); }
       setImportResults(results);
       setImportToast(`Import färdig! ${results.filter(r=>r.success).length} av ${results.length} rader importerade.`);
       setImporting(false);
@@ -439,12 +450,13 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                       const matchedRule = getMatchedRule(row);
                       return (
                         <tr key={i} className={duplicate ? "bg-gray-200" : matchedRule ? "bg-blue-50" : ""}>
-                          <td className="border px-2 py-1 text-center">
+                          <td className={"border px-2 py-1 text-center " + (duplicate ? "bg-gray-100" : "") }>
                             <input
                               type="checkbox"
                               checked={selectedRows.includes(i)}
                               onChange={() => handleSelectRow(i)}
                               disabled={duplicate}
+                              style={duplicate ? { opacity: 0.5, pointerEvents: "none" } : {}}
                             />
                           </td>
                           {/* Only show columns that are mapped to an internal field */}
@@ -469,24 +481,47 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   </tbody>
                 </table>
               </div>
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
                 <div className="text-xs text-gray-600">
                   {selectedRows.length} av {csvData.length} poster valda för import
                 </div>
-                <button
-                  className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700"
-                  onClick={handleImport}
-                  disabled={
-                    selectedRows.length === 0 ||
-                    csvData.some(isDuplicate) || importing ||
-                    (() => {
-                      const used = Object.values(fieldMapping).filter(Boolean);
-                      return used.length !== new Set(used).size;
-                    })()
-                  }
-                >
-                  {importing ? "Importerar..." : "Importera markerade rader"}
-                </button>
+                <div className="flex flex-col items-end">
+                  <button
+                    className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500"
+                    onClick={handleImport}
+                    disabled={
+                      selectedRows.length === 0 ||
+                      selectedRows.every(i => isDuplicate(csvData[i])) || importing ||
+                      !selectedCategory || !selectedSupplier ||
+                      (() => {
+                        const used = Object.values(fieldMapping).filter(Boolean);
+                        return used.length !== new Set(used).size;
+                      })()
+                    }
+                  >
+                    {importing ? "Importerar..." : "Importera markerade rader"}
+                  </button>
+                  {/* Feedback why button is disabled */}
+                  {selectedRows.length === 0 && (
+                    <span className="text-xs text-gray-500 mt-1">Välj minst en rad att importera</span>
+                  )}
+                  {selectedRows.length > 0 && selectedRows.every(i => isDuplicate(csvData[i])) && (
+                    <span className="text-xs text-yellow-600 mt-1">Alla valda rader är dubletter</span>
+                  )}
+                  {!selectedCategory && (
+                    <span className="text-xs text-yellow-600 mt-1">Välj kategori innan import</span>
+                  )}
+                  {!selectedSupplier && (
+                    <span className="text-xs text-yellow-600 mt-1">Välj leverantör innan import</span>
+                  )}
+                  {(() => {
+                    const used = Object.values(fieldMapping).filter(Boolean);
+                    if (used.length !== new Set(used).size) {
+                      return <span className="text-xs text-yellow-600 mt-1">Fältkrock: samma internfält är valt för flera kolumner</span>;
+                    }
+                    return null;
+                  })()}
+                </div>
               </div>
               {importToast && (
                 <div className="mb-4 p-2 rounded bg-green-50 text-green-700 text-sm">
