@@ -639,7 +639,14 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                     disabled={
                       selectedRows.length === 0 ||
                       selectedRows.some(i => isDuplicate(csvData[i])) || importing ||
-                      selectedRows.some(i => !(rowCategory[i] && rowSupplier[i])) ||
+                      selectedRows.some(i => {
+                        // Hämta kategori och leverantör, antingen från regel eller manuellt val
+                        const row = csvData[i];
+                        const matchedRule = getMatchedRule(row);
+                        const categoryId = rowCategory[i] || matchedRule?.category;
+                        const supplierId = rowSupplier[i] || matchedRule?.supplier;
+                        return !(categoryId && supplierId);
+                      }) ||
                       (() => {
                         const used = Object.values(fieldMapping).filter(Boolean);
                         return used.length !== new Set(used).size;
@@ -655,10 +662,20 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   {selectedRows.length > 0 && selectedRows.some(i => isDuplicate(csvData[i])) && (
                     <span className="text-xs text-yellow-600 mt-1">Minst en vald rad är en dubblett</span>
                   )}
-                  {selectedRows.some(i => !(rowCategory[i])) && (
+                  {selectedRows.some(i => {
+                    const row = csvData[i];
+                    const matchedRule = getMatchedRule(row);
+                    const categoryId = rowCategory[i] || matchedRule?.category;
+                    return !categoryId;
+                  }) && (
                     <span className="text-xs text-yellow-600 mt-1">Välj kategori på alla valda rader</span>
                   )}
-                  {selectedRows.some(i => !(rowSupplier[i])) && (
+                  {selectedRows.some(i => {
+                    const row = csvData[i];
+                    const matchedRule = getMatchedRule(row);
+                    const supplierId = rowSupplier[i] || matchedRule?.supplier;
+                    return !supplierId;
+                  }) && (
                     <span className="text-xs text-yellow-600 mt-1">Välj leverantör på alla valda rader</span>
                   )}
                   {(() => {
