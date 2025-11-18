@@ -17,6 +17,11 @@ const EconomyPage: React.FC = () => {
         const { items, addItem, fetchItems } = useEconomyStore();
 
         // Filter för månad och år
+          // Avancerade filter
+          const [searchText, setSearchText] = useState('');
+          const [filterCategory, setFilterCategory] = useState('');
+          const [filterSupplier, setFilterSupplier] = useState('');
+          const [filterValid, setFilterValid] = useState('all');
         const now = new Date();
         const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
         const currentYear = String(now.getFullYear());
@@ -41,10 +46,32 @@ const EconomyPage: React.FC = () => {
           }
         };
         // Filtrera poster
-        const filteredItems = items.filter(i =>
+        let filteredItems = items.filter(i =>
           String(i.year) === selectedYear &&
           selectedMonths.includes(String(i.month).padStart(2, '0'))
         );
+        // Filter på kategori
+        if (filterCategory) filteredItems = filteredItems.filter(i => i.category === filterCategory);
+        // Filter på leverantör
+        if (filterSupplier) filteredItems = filteredItems.filter(i => i.supplier === filterSupplier);
+        // Filter på giltiga poster
+        if (filterValid === 'valid') {
+          filteredItems = filteredItems.filter(i => /^[a-fA-F0-9]{24}$/.test(i.id) && i.name && i.category && i.supplier && typeof i.amount === 'number');
+        } else if (filterValid === 'invalid') {
+          filteredItems = filteredItems.filter(i => !(/^[a-fA-F0-9]{24}$/.test(i.id) && i.name && i.category && i.supplier && typeof i.amount === 'number'));
+        }
+        // Filter på söktext
+        if (searchText.trim()) {
+          const lower = searchText.trim().toLowerCase();
+          filteredItems = filteredItems.filter(i =>
+            (i.displayId || i.id || '').toLowerCase().includes(lower) ||
+            (i.name || '').toLowerCase().includes(lower) ||
+            (i.type || '').toLowerCase().includes(lower) ||
+            getCategoryName(i.category).toLowerCase().includes(lower) ||
+            getSupplierName(i.supplier).toLowerCase().includes(lower) ||
+            (i.note || '').toLowerCase().includes(lower)
+          );
+        }
         // Batch-hantering state
         const [selectedIds, setSelectedIds] = useState<string[]>([]);
         const allFilteredIds = filteredItems.map(i => i.id);
@@ -348,24 +375,24 @@ const EconomyPage: React.FC = () => {
         <ImportCsvModal open={showImportModal} onClose={() => setShowImportModal(false)} />
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Lägg till ny post</h2>
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
-            style={{ minWidth: 120 }}
-            onClick={() => setShowImportModal(true)}
-          >
-            Importera CSV
-          </button>
-        </div>
-        <div className="flex justify-end mb-4">
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
-            style={{ minWidth: 120 }}
-            onClick={exportToCSV}
-          >
-            Exportera till CSV
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+              style={{ minWidth: 120 }}
+              onClick={exportToCSV}
+            >
+              Exportera till CSV
+            </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+              style={{ minWidth: 120 }}
+              onClick={() => setShowImportModal(true)}
+            >
+              Importera CSV
+            </button>
+          </div>
         </div>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
           e.preventDefault();
@@ -435,6 +462,46 @@ const EconomyPage: React.FC = () => {
             <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(true)} disabled={!selectedCategory}>+</button>
           </div>
           <textarea placeholder="Notering" className="p-2 rounded border dark:bg-slate-800 dark:text-white md:col-span-2" value={note} onChange={e => setNote(e.target.value)} />
+          {/* Filterblock flyttad hit, ovanför Lägg till-knappen */}
+          <div className="bg-white dark:bg-slate-800 rounded p-4 mb-6 flex flex-wrap gap-4 items-center md:col-span-2">
+            <input
+              type="text"
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white w-48"
+              placeholder="Sök..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+            />
+            <select
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white"
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+            >
+              <option value="">Alla kategorier</option>
+              {categories.map(cat => (
+                <option key={cat.id || cat.name} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+            <select
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white"
+              value={filterSupplier}
+              onChange={e => setFilterSupplier(e.target.value)}
+              disabled={!filterCategory}
+            >
+              <option value="">Alla leverantörer</option>
+              {suppliers.map(sup => (
+                <option key={sup.id || sup.name} value={sup.id}>{sup.name}</option>
+              ))}
+            </select>
+            <select
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white"
+              value={filterValid}
+              onChange={e => setFilterValid(e.target.value)}
+            >
+              <option value="all">Alla poster</option>
+              <option value="valid">Endast giltiga</option>
+              <option value="invalid">Endast ogiltiga</option>
+            </select>
+          </div>
           <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 md:col-span-2">Lägg till</button>
         </form>
         {/* Modal för ny kategori */}
