@@ -8,8 +8,46 @@ import Toast from '../../components/Toast';
 import UndoToast from '../../components/UndoToast';
 import { useEconomyStore } from '../../store/useEconomyStore';
 import { uploadImage, deleteImage, getImages } from '../../api/imageApi';
+import EconomySummary from '../../components/EconomySummary';
 
 const EconomyPage: React.FC = () => {
+        // ...existing code...
+        const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
+        const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
+        const { items, addItem, fetchItems } = useEconomyStore();
+
+        // Filter för månad och år
+        const now = new Date();
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const currentYear = String(now.getFullYear());
+        const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+        const [selectedYear, setSelectedYear] = useState<string>(currentYear);
+        const monthLabels = ['Alla', 'Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
+        const allYears = Array.from(new Set(items.map(i => String(i.year)))).sort();
+        // Hantera klick på månad
+        const handleMonthClick = (idx: number) => {
+          if (idx === 0) {
+            if (selectedMonths.length === 12) {
+              setSelectedMonths([]); // Avmarkera alla
+            } else {
+              setSelectedMonths(['01','02','03','04','05','06','07','08','09','10','11','12']); // Markera alla
+            }
+          } else {
+            const m = String(idx).padStart(2, '0');
+            setSelectedMonths(selectedMonths.includes(m)
+              ? selectedMonths.filter(x => x !== m)
+              : [...selectedMonths, m]
+            );
+          }
+        };
+        // Filtrera poster
+        const filteredItems = items.filter(i =>
+          String(i.year) === selectedYear &&
+          selectedMonths.includes(String(i.month).padStart(2, '0'))
+        );
+        const totalIncome = filteredItems.filter(i => i.type === 'income').reduce((sum, i) => sum + (typeof i.amount === 'number' ? i.amount : 0), 0);
+        const totalExpense = filteredItems.filter(i => i.type === 'expense').reduce((sum, i) => sum + (typeof i.amount === 'number' ? i.amount : 0), 0);
+        const net = totalIncome - totalExpense;
       // Modal för notering
       const [showNoteModal, setShowNoteModal] = useState(false);
       const [noteModalContent, setNoteModalContent] = useState('');
@@ -96,9 +134,6 @@ const EconomyPage: React.FC = () => {
     _setSelectedSupplier(id);
     localStorage.setItem('selectedSupplier', id);
   };
-  const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
-  const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
-  const { items, addItem, fetchItems } = useEconomyStore();
 
   // Visa alla leverantörer, men dropdown är disabled tills kategori är vald
   const allSuppliers = suppliers;
@@ -251,8 +286,42 @@ const EconomyPage: React.FC = () => {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6 text-blue-700 dark:text-blue-300">Ekonomihantering</h1>
-      {/* Formulär med kategori/leverantör-dropdowns och plus-knapp */}
-      {/* Ingen vanlig toast, endast UndoToast används nu */}
+      {/* Filter för månad och år */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex gap-1 flex-wrap">
+          {monthLabels.map((label, idx) => (
+            <button
+              key={label}
+              type="button"
+              className={`px-3 py-1 rounded shadow text-xs font-semibold border transition-all ${
+                idx === 0
+                  ? selectedMonths.length === 12 ? 'bg-blue-700 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-white'
+                  : selectedMonths.includes(String(idx).padStart(2, '0')) ? 'bg-blue-700 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-white'
+              }`}
+              onClick={() => handleMonthClick(idx)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <select
+          className="p-2 rounded border dark:bg-slate-800 dark:text-white"
+          value={selectedYear}
+          onChange={e => setSelectedYear(e.target.value)}
+        >
+          {allYears.map(y => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+      {/* Summeringsrutor */}
+      <EconomySummary
+        income={totalIncome}
+        expense={totalExpense}
+        net={net}
+        selectedMonths={selectedMonths}
+        selectedYear={selectedYear}
+      />
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow mb-8">
         <ImportCsvModal open={showImportModal} onClose={() => setShowImportModal(false)} />
         <div className="flex items-center justify-between mb-4">
@@ -276,7 +345,6 @@ const EconomyPage: React.FC = () => {
             Exportera till CSV
           </button>
         </div>
-          
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
           e.preventDefault();
           if (!name || !amount || !type || !month || !selectedCategory || !selectedSupplier) {
