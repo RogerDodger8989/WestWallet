@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { fetchRules, addRule, updateRule, deleteRule, Rule as ApiRule } from "../api/ruleApi";
 import { useCategoryStore } from "../store/useCategoryStore";
 import { useSupplierStore } from "../store/useSupplierStore";
 import Papa from "papaparse";
@@ -80,55 +81,47 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
       const handleRowSupplierChange = (rowIdx: number, supplierId: string) => {
         setRowSupplier(prev => ({ ...prev, [rowIdx]: supplierId }));
       };
-    // Regelhantering
-    const [rules, setRules] = useState<{ contains: string; category: string; supplier?: string }[]>([]);
-    // Load rules from localStorage on mount
-    useEffect(() => {
-      const stored = localStorage.getItem("importRules");
-      if (stored) {
-        try {
-          setRules(JSON.parse(stored));
-        } catch {}
-      }
-    }, []);
-    // Save rules to localStorage whenever they change
-    useEffect(() => {
-      localStorage.setItem("importRules", JSON.stringify(rules));
-    }, [rules]);
+    // Regelhantering via API
+    const [rules, setRules] = useState<ApiRule[]>([]);
     const [newRuleContains, setNewRuleContains] = useState("");
     const [newRuleCategory, setNewRuleCategory] = useState("");
     const [newRuleSupplier, setNewRuleSupplier] = useState("");
-    const [editRuleId, setEditRuleId] = useState<number | null>(null);
+    const [editRuleId, setEditRuleId] = useState<string | null>(null);
 
-    const handleAddRule = () => {
+    // Ladda regler från backend vid mount
+    useEffect(() => {
+      fetchRules().then(setRules).catch(() => setRules([]));
+    }, []);
+
+    const handleAddRule = async () => {
       if (!newRuleContains.trim() || !newRuleCategory) return;
-      setRules(prev => [
-        ...prev,
-        { contains: newRuleContains.trim(), category: newRuleCategory, supplier: newRuleSupplier }
-      ]);
+      const rule = await addRule({ contains: newRuleContains.trim(), category: newRuleCategory, supplier: newRuleSupplier });
+      setRules(prev => [...prev, rule]);
       setNewRuleContains("");
       setNewRuleCategory("");
       setNewRuleSupplier("");
     };
-    const handleEditRule = (idx: number) => {
-      setEditRuleId(idx);
-      setNewRuleContains(rules[idx].contains);
-      setNewRuleCategory(rules[idx].category);
-      setNewRuleSupplier(rules[idx].supplier || "");
+    const handleEditRule = (id: string) => {
+      const rule = rules.find(r => r._id === id);
+      if (!rule) return;
+      setEditRuleId(id);
+      setNewRuleContains(rule.contains);
+      setNewRuleCategory(rule.category);
+      setNewRuleSupplier(rule.supplier || "");
     };
-    const handleSaveEditRule = () => {
-      if (editRuleId === null) return;
-      setRules(prev => prev.map((r, i) =>
-        i === editRuleId ? { contains: newRuleContains.trim(), category: newRuleCategory, supplier: newRuleSupplier } : r
-      ));
+    const handleSaveEditRule = async () => {
+      if (!editRuleId) return;
+      const updated = await updateRule(editRuleId, { contains: newRuleContains.trim(), category: newRuleCategory, supplier: newRuleSupplier });
+      setRules(prev => prev.map(r => r._id === editRuleId ? updated : r));
       setEditRuleId(null);
       setNewRuleContains("");
       setNewRuleCategory("");
       setNewRuleSupplier("");
     };
-    const handleDeleteRule = (idx: number) => {
-      setRules(prev => prev.filter((_, i) => i !== idx));
-      if (editRuleId === idx) setEditRuleId(null);
+    const handleDeleteRule = async (id: string) => {
+      await deleteRule(id);
+      setRules(prev => prev.filter(r => r._id !== id));
+      if (editRuleId === id) setEditRuleId(null);
     };
   // State
   const [csvData, setCsvData] = useState<any[]>([]);
@@ -191,7 +184,11 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
     if (selectedRows.length === csvData.length) {
       setSelectedRows([]);
     } else {
-      setSelectedRows(csvData.map((_, i) => i));
+      // Markera endast rader som INTE är dubbletter
+      const nonDuplicateRows = csvData
+        .map((row, i) => isDuplicate(row) ? null : i)
+        .filter(i => i !== null) as number[];
+      setSelectedRows(nonDuplicateRows);
     }
   };
   const handleCreateCategory = async () => {
@@ -218,16 +215,22 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
 
   // Dubblettkontroll mot economy
   const isDuplicate = (row: Record<string, any>) => {
-    // Bokfört saldo = amount, Beskrivning = description, Belopp = amount
     const desc = fieldMapping["description"] ? row[fieldMapping["description"]] : row["Beskrivning"] || "";
     const amount = fieldMapping["amount"] ? Number(row[fieldMapping["amount"]]) : Number(row["Belopp"] || 0);
-    // Bokfört saldo: match mot economyItem.amount
-    // Beskrivning: match mot economyItem.name
-    // Belopp: match mot economyItem.amount
-    return economyItems.some(item =>
-      item.name === desc &&
-      item.amount === amount
-    );
+    const dateStr = fieldMapping["date"] ? row[fieldMapping["date"]] : row["Datum"] || "";
+    let date = "";
+    if (dateStr) {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) date = d.toISOString().slice(0, 10);
+    }
+    return economyItems.some(item => {
+      let itemDate = "";
+      if (item.date) {
+        const d = new Date(item.date);
+        if (!isNaN(d.getTime())) itemDate = d.toISOString().slice(0, 10);
+      }
+      return item.name === desc && item.amount === amount && itemDate === date;
+    });
   };
 
   // Importera markerade poster (just nu loggas bara datan)

@@ -7,6 +7,7 @@ export interface Rule {
   contains: string;
   category: string;
   supplier: string;
+  userId: string;
 }
 
 @Injectable()
