@@ -45,6 +45,28 @@ const EconomyPage: React.FC = () => {
           String(i.year) === selectedYear &&
           selectedMonths.includes(String(i.month).padStart(2, '0'))
         );
+        // Batch-hantering state
+        const [selectedIds, setSelectedIds] = useState<string[]>([]);
+        const allFilteredIds = filteredItems.map(i => i.id);
+        const allSelected = selectedIds.length === allFilteredIds.length && allFilteredIds.length > 0;
+        const toggleSelectAll = () => {
+          setSelectedIds(allSelected ? [] : allFilteredIds);
+        };
+        const toggleSelectOne = (id: string) => {
+          setSelectedIds(selectedIds.includes(id)
+            ? selectedIds.filter(x => x !== id)
+            : [...selectedIds, id]
+          );
+        };
+        const handleBatchDelete = async () => {
+          if (selectedIds.length === 0) return;
+          for (const id of selectedIds) {
+            await useEconomyStore.getState().deleteItem(id);
+          }
+          setSelectedIds([]);
+          fetchItems();
+          setToast({ message: `${selectedIds.length} poster raderade!`, type: 'success' });
+        };
         const totalIncome = filteredItems.filter(i => i.type === 'income').reduce((sum, i) => sum + (typeof i.amount === 'number' ? i.amount : 0), 0);
         const totalExpense = filteredItems.filter(i => i.type === 'expense').reduce((sum, i) => sum + (typeof i.amount === 'number' ? i.amount : 0), 0);
         const net = totalIncome - totalExpense;
@@ -473,82 +495,133 @@ const EconomyPage: React.FC = () => {
       </div>
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow">
         <h2 className="font-semibold mb-4">Transaktioner</h2>
-        {items.length === 0 ? (
-          <div className="text-gray-500">Inga poster sparade ännu.</div>
+        {filteredItems.length === 0 ? (
+          <div className="text-gray-500">Inga poster sparade för valt filter.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-blue-100 dark:bg-slate-800">
-                  <th className="px-2 py-1">Månad</th>
-                  <th className="px-2 py-1">ID</th>
-                  <th className="px-2 py-1">Namn</th>
-                  <th className="px-2 py-1">Typ</th>
-                  <th className="px-2 py-1">Kategori</th>
-                  <th className="px-2 py-1">Leverantör</th>
-                  <th className="px-2 py-1">Belopp</th>
-                  <th className="px-2 py-1">Bild</th>
-                  <th className="px-2 py-1">Notering</th>
-                  <th className="px-2 py-1">Åtgärder</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items
-                  .filter(item => /^[a-fA-F0-9]{24}$/.test(item.id))
-                  .filter(item => item.name && item.category && item.supplier && typeof item.amount === 'number')
-                  .map((item, index) => (
-                  <tr key={(item.id || '') + '-' + index} className="border-b text-center hover:bg-blue-100 transition-colors">
-                    <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
-                    <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
-                     <td className="px-2 py-1 text-center hover:bg-blue-100">{item.name}</td>
-                    <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
-                    <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
-                    <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
-                    <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr</td>
-                    <td className="px-2 py-1 text-center">
-                      <span
-                        className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        title={item.images && item.images.length > 0 ? `${item.images.length} bild${item.images.length > 1 ? 'er' : ''} bifogad` : 'Inga bilder'}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontWeight: 'bold', fontSize: '0.85rem' }}
-                        onClick={async () => {
-                          setSelectedItem(item);
-                          setShowImageModal(true);
-                          setImageLoading(true);
-                          try {
-                            const imgs = await getImages(item.id, 'economy');
-                            setImageList(imgs);
-                            setImageError('');
-                          } catch (err: any) {
-                            setImageError('Kunde inte hämta bilder');
-                          }
-                          setImageLoading(false);
-                        }}
-                      >
-                        {item.images && item.images.length > 0 ? (
-                          <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>{item.images.length}</span>
-                        ) : null}
-                      </span>
-                          {/* Modal för bildhantering */}
-                          {showImageModal && selectedItem && (
-                            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                              <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-[500px] max-h-[80vh] overflow-y-auto relative">
-                                <h3 className="font-semibold mb-2">Bilder för post: {selectedItem.displayId}</h3>
-                                {imageError && <div className="text-red-600 mb-2">{imageError}</div>}
-                                <div
-                                  className="border-2 border-dashed rounded p-4 mb-4 text-center cursor-pointer bg-gray-50"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-                                  onDrop={async e => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const files = Array.from(e.dataTransfer.files);
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                id="selectAll"
+              />
+              <label htmlFor="selectAll" className="text-sm font-semibold">Markera alla</label>
+              <button
+                type="button"
+                className="px-3 py-1 bg-red-600 text-white rounded shadow hover:bg-red-700 ml-2"
+                disabled={selectedIds.length === 0}
+                onClick={handleBatchDelete}
+              >
+                Radera markerade
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-blue-100 dark:bg-slate-800">
+                    <th className="px-2 py-1 text-center">
+                      {/* Tomt för checkbox */}
+                    </th>
+                    <th className="px-2 py-1">Månad</th>
+                    <th className="px-2 py-1">ID</th>
+                    <th className="px-2 py-1">Namn</th>
+                    <th className="px-2 py-1">Typ</th>
+                    <th className="px-2 py-1">Kategori</th>
+                    <th className="px-2 py-1">Leverantör</th>
+                    <th className="px-2 py-1">Belopp</th>
+                    <th className="px-2 py-1">Bild</th>
+                    <th className="px-2 py-1">Notering</th>
+                    <th className="px-2 py-1">Åtgärder</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems
+                    .filter(item => /^[a-fA-F0-9]{24}$/.test(item.id))
+                    .filter(item => item.name && item.category && item.supplier && typeof item.amount === 'number')
+                    .map((item, index) => (
+                    <tr key={(item.id || '') + '-' + index} className="border-b text-center hover:bg-blue-100 transition-colors">
+                      <td className="px-2 py-1 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => toggleSelectOne(item.id)}
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
+                      <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
+                      <td className="px-2 py-1 text-center hover:bg-blue-100">{item.name}</td>
+                      <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
+                      <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
+                      <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
+                      <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr</td>
+                      <td className="px-2 py-1 text-center">
+                        <span
+                          className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={item.images && item.images.length > 0 ? `${item.images.length} bild${item.images.length > 1 ? 'er' : ''} bifogad` : 'Inga bilder'}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontWeight: 'bold', fontSize: '0.85rem' }}
+                          onClick={async () => {
+                            setSelectedItem(item);
+                            setShowImageModal(true);
+                            setImageLoading(true);
+                            try {
+                              const imgs = await getImages(item.id, 'economy');
+                              setImageList(imgs);
+                              setImageError('');
+                            } catch (err: any) {
+                              setImageError('Kunde inte hämta bilder');
+                            }
+                            setImageLoading(false);
+                          }}
+                        >
+                          {item.images && item.images.length > 0 ? (
+                            <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>{item.images.length}</span>
+                          ) : null}
+                        </span>
+                        {/* Modal för bildhantering */}
+                        {showImageModal && selectedItem && selectedItem.id === item.id && (
+                          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-[500px] max-h-[80vh] overflow-y-auto relative">
+                              <h3 className="font-semibold mb-2">Bilder för post: {selectedItem.displayId}</h3>
+                              {imageError && <div className="text-red-600 mb-2">{imageError}</div>}
+                              <div
+                                className="border-2 border-dashed rounded p-4 mb-4 text-center cursor-pointer bg-gray-50"
+                                onClick={() => fileInputRef.current?.click()}
+                                onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                                onDrop={async e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const files = Array.from(e.dataTransfer.files);
+                                  setImageLoading(true);
+                                  try {
+                                    await uploadImage(selectedItem.id, files as File[], 'economy');
+                                    const imgs = await getImages(selectedItem.id, 'economy');
+                                    setImageList(imgs);
+                                    setImageError('');
+                                    useEconomyStore.setState(state => ({
+                                      items: state.items.map(i =>
+                                        i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                      )
+                                    }));
+                                  } catch (err: any) {
+                                    setImageError('Kunde inte ladda upp bilder');
+                                  }
+                                  setImageLoading(false);
+                                }}
+                              >
+                                <input
+                                  type="file"
+                                  multiple
+                                  ref={fileInputRef}
+                                  style={{ display: 'none' }}
+                                  onChange={async e => {
+                                    if (!e.target.files) return;
                                     setImageLoading(true);
                                     try {
-                                      await uploadImage(selectedItem.id, files as File[], 'economy');
+                                      await uploadImage(selectedItem.id, Array.from(e.target.files), 'economy');
                                       const imgs = await getImages(selectedItem.id, 'economy');
                                       setImageList(imgs);
                                       setImageError('');
-                                      // Uppdatera images-arrayen för rätt item i Zustand-store
                                       useEconomyStore.setState(state => ({
                                         items: state.items.map(i =>
                                           i.id === selectedItem.id ? { ...i, images: imgs } : i
@@ -559,128 +632,86 @@ const EconomyPage: React.FC = () => {
                                     }
                                     setImageLoading(false);
                                   }}
-                                >
-                                  <input
-                                    type="file"
-                                    multiple
-                                    ref={fileInputRef}
-                                    style={{ display: 'none' }}
-                                    onChange={async e => {
-                                      if (!e.target.files) return;
-                                      setImageLoading(true);
-                                      try {
-                                        await uploadImage(selectedItem.id, Array.from(e.target.files), 'economy');
-                                        const imgs = await getImages(selectedItem.id, 'economy');
-                                        setImageList(imgs);
-                                        setImageError('');
-                                        // Uppdatera images-arrayen för rätt item i Zustand-store
-                                        useEconomyStore.setState(state => ({
-                                          items: state.items.map(i =>
-                                            i.id === selectedItem.id ? { ...i, images: imgs } : i
-                                          )
-                                        }));
-                                      } catch (err: any) {
-                                        setImageError('Kunde inte ladda upp bilder');
-                                      }
-                                      setImageLoading(false);
-                                    }}
-                                  />
-                                  <span className="text-gray-600">Dra in bilder här eller klicka för att välja filer</span>
-                                </div>
-                                <div className="flex flex-wrap gap-3 mb-4">
-                                  {imageLoading ? <span>Laddar bilder...</span> : null}
-                                  {imageList.length === 0 && !imageLoading ? <span className="text-gray-400">Inga bilder uppladdade.</span> : null}
-                                  {imageList.map(img => (
-                                    <div key={img} className="relative group">
-                                      <img
-                                        src={img}
-                                        alt="thumbnail"
-                                        className="w-20 h-20 object-cover rounded shadow cursor-pointer border border-gray-300"
-                                        onClick={() => setOverlayImage(img)}
-                                      />
-                                      <button
-                                        className="absolute top-1 right-1 bg-red-600 text-white rounded px-2 py-1 text-xs opacity-80 group-hover:opacity-100"
-                                        title="Ta bort bild"
-                                        onClick={async e => {
-                                          e.stopPropagation();
-                                          setImageLoading(true);
-                                          try {
-                                            const filename = img.split('/').pop() || img;
-                                            await deleteImage(selectedItem.id, filename, 'economy');
-                                            const imgs = await getImages(selectedItem.id, 'economy');
-                                            setImageList(imgs);
-                                            setImageError('');
-                                            useEconomyStore.setState(state => ({
-                                              items: state.items.map(i =>
-                                                i.id === selectedItem.id ? { ...i, images: imgs } : i
-                                              )
-                                            }));
-                                            // Visa UndoToast för bildradering
-                                            setToast({ message: 'Bild raderad!', type: 'error' });
-                                            setTimeout(() => setToast(null), 3000);
-                                          } catch (err: any) {
-                                            setImageError('Kunde inte ta bort bild');
-                                          }
-                                          setImageLoading(false);
-                                        }}
-                                      >🗑️</button>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="flex gap-2 justify-end mt-4">
-                                  <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowImageModal(false); setSelectedItem(null); setImageList([]); setOverlayImage(null); }}>Stäng</button>
-                                </div>
-                                {/* Overlay för stor bild */}
-                                {overlayImage && (
-                                  <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setOverlayImage(null)}>
-                                    <img src={overlayImage} alt="stor bild" className="max-w-[80vw] max-h-[80vh] rounded shadow-lg" />
-                                  </div>
-                                )}
+                                />
+                                <span className="text-gray-600">Dra in bilder här eller klicka för att välja filer</span>
                               </div>
+                              <div className="flex flex-wrap gap-3 mb-4">
+                                {imageLoading ? <span>Laddar bilder...</span> : null}
+                                {imageList.length === 0 && !imageLoading ? <span className="text-gray-400">Inga bilder uppladdade.</span> : null}
+                                {imageList.map(img => (
+                                  <div key={img} className="relative group">
+                                    <img
+                                      src={img}
+                                      alt="thumbnail"
+                                      className="w-20 h-20 object-cover rounded shadow cursor-pointer border border-gray-300"
+                                      onClick={() => setOverlayImage(img)}
+                                    />
+                                    <button
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded px-2 py-1 text-xs opacity-80 group-hover:opacity-100"
+                                      title="Ta bort bild"
+                                      onClick={async e => {
+                                        e.stopPropagation();
+                                        setImageLoading(true);
+                                        try {
+                                          const filename = img.split('/').pop() || img;
+                                          await deleteImage(selectedItem.id, filename, 'economy');
+                                          const imgs = await getImages(selectedItem.id, 'economy');
+                                          setImageList(imgs);
+                                          setImageError('');
+                                          useEconomyStore.setState(state => ({
+                                            items: state.items.map(i =>
+                                              i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                            )
+                                          }));
+                                          setToast({ message: 'Bild raderad!', type: 'error' });
+                                          setTimeout(() => setToast(null), 3000);
+                                        } catch (err: any) {
+                                          setImageError('Kunde inte ta bort bild');
+                                        }
+                                        setImageLoading(false);
+                                      }}
+                                    >🗑️</button>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex gap-2 justify-end mt-4">
+                                <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowImageModal(false); setSelectedItem(null); setImageList([]); setOverlayImage(null); }}>Stäng</button>
+                              </div>
+                              {/* Overlay för stor bild */}
+                              {overlayImage && (
+                                <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setOverlayImage(null)}>
+                                  <img src={overlayImage} alt="stor bild" className="max-w-[80vw] max-h-[80vh] rounded shadow-lg" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                    </td>
-                    <td className="px-2 py-1 text-center" style={{ position: 'relative' }}>
-                      <span
-                        className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
-                        onClick={() => { setNoteModalContent(item.note || ''); setShowNoteModal(true); }}
-                        onMouseEnter={e => {
-                          const tooltip = document.createElement('div');
-                          tooltip.innerText = item.note || 'Ingen notering';
-                          tooltip.style.position = 'fixed';
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          tooltip.style.top = `${rect.top - 40}px`;
-                          tooltip.style.left = `${rect.left + rect.width / 2}px`;
-                          tooltip.style.transform = 'translateX(-50%)';
-                          tooltip.style.background = '#fff';
-                          tooltip.style.color = '#222';
-                          tooltip.style.padding = '6px 12px';
-                          tooltip.style.borderRadius = '6px';
-                          tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                          tooltip.style.zIndex = '9999';
-                          tooltip.className = 'note-tooltip';
-                          document.body.appendChild(tooltip);
-                        }}
-                        onMouseLeave={e => {
-                          const tooltips = document.querySelectorAll('.note-tooltip');
-                          tooltips.forEach(t => t.remove());
-                        }}
-                      />
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => openEditModal(item)}>
-                        <span role="img" aria-label="edit">✏️</span>
-                      </button>
-                      <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => openDeleteModal(item)}>
-                        <span role="img" aria-label="delete">🗑️</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1 text-center" style={{ position: 'relative' }}>
+                        <span
+                          className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                          onClick={() => { setNoteModalContent(item.note || ''); setShowNoteModal(true); }}
+                        >
+                          {item.note && item.note.length > 0 ? (
+                            <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>i</span>
+                          ) : null}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1 text-center">
+                        <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => openEditModal(item)}>
+                          <span role="img" aria-label="edit">✏️</span>
+                        </button>
+                        <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => openDeleteModal(item)}>
+                          <span role="img" aria-label="delete">🗑️</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       {/* Modal för notering */}
       {showNoteModal && (
