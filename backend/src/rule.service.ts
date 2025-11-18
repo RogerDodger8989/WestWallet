@@ -13,8 +13,8 @@ export interface Rule {
 export class RuleService {
   constructor(@InjectModel('Rule') private ruleModel: Model<Rule>) {}
 
-  async findAll(): Promise<Rule[]> {
-    return this.ruleModel.find().exec();
+  async findAllByUser(userId: string): Promise<Rule[]> {
+    return this.ruleModel.find({ userId }).exec();
   }
 
   async create(rule: Rule): Promise<Rule> {

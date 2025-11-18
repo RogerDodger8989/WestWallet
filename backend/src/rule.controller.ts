@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Delete, Param, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Param, Put, Req, UseGuards } from '@nestjs/common';
 import { RuleService } from './rule.service';
 import type { Rule } from './rule.service';
 
@@ -7,13 +7,13 @@ export class RuleController {
   constructor(private readonly ruleService: RuleService) {}
 
   @Get()
-  async getAll(): Promise<Rule[]> {
-    return this.ruleService.findAll();
+  async getAll(@Req() req): Promise<Rule[]> {
+    return this.ruleService.findAllByUser(req.user.id);
   }
 
   @Post()
-  async create(@Body() rule: Rule): Promise<Rule> {
-    return this.ruleService.create(rule);
+  async create(@Req() req, @Body() rule: Rule): Promise<Rule> {
+    return this.ruleService.create({ ...rule, userId: req.user.id });
   }
 
   @Delete(':id')
