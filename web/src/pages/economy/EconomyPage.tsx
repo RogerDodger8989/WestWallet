@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import MonthPicker from '../../components/MonthPicker';
+import ImportCsvModal from '../../components/ImportCsvModal';
 import type { EconomyItem } from '../../store/useEconomyStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSupplierStore } from '../../store/useSupplierStore';
@@ -6,14 +8,132 @@ import Toast from '../../components/Toast';
 import UndoToast from '../../components/UndoToast';
 import { useEconomyStore } from '../../store/useEconomyStore';
 import { uploadImage, deleteImage, getImages } from '../../api/imageApi';
+import EconomySummary from '../../components/EconomySummary';
 
 const EconomyPage: React.FC = () => {
+        // ...existing code...
+        const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
+        const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
+        const { items, addItem, fetchItems } = useEconomyStore();
+
+        // Filter för månad och år
+          // Avancerade filter
+          const [searchText, setSearchText] = useState('');
+          const [filterCategory, setFilterCategory] = useState('');
+          const [filterSupplier, setFilterSupplier] = useState('');
+          const [filterValid, setFilterValid] = useState('all');
+        const now = new Date();
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const currentYear = String(now.getFullYear());
+        const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+        const [selectedYear, setSelectedYear] = useState<string>(currentYear);
+        const monthLabels = ['Alla', 'Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
+        const allYears = Array.from(new Set(items.map(i => String(i.year)))).sort();
+        // Hantera klick på månad
+        const handleMonthClick = (idx: number) => {
+          if (idx === 0) {
+            if (selectedMonths.length === 12) {
+              setSelectedMonths([]); // Avmarkera alla
+            } else {
+              setSelectedMonths(['01','02','03','04','05','06','07','08','09','10','11','12']); // Markera alla
+            }
+          } else {
+            const m = String(idx).padStart(2, '0');
+            setSelectedMonths(selectedMonths.includes(m)
+              ? selectedMonths.filter(x => x !== m)
+              : [...selectedMonths, m]
+            );
+          }
+        };
+        // Filtrera poster
+        let filteredItems = items.filter(i =>
+          String(i.year) === selectedYear &&
+          selectedMonths.includes(String(i.month).padStart(2, '0'))
+        );
+        // Filter på kategori
+        if (filterCategory) filteredItems = filteredItems.filter(i => i.category === filterCategory);
+        // Filter på leverantör
+        if (filterSupplier) filteredItems = filteredItems.filter(i => i.supplier === filterSupplier);
+        // Filter på giltiga poster
+        if (filterValid === 'valid') {
+          filteredItems = filteredItems.filter(i => /^[a-fA-F0-9]{24}$/.test(i.id) && i.name && i.category && i.supplier && typeof i.amount === 'number');
+        } else if (filterValid === 'invalid') {
+          filteredItems = filteredItems.filter(i => !(/^[a-fA-F0-9]{24}$/.test(i.id) && i.name && i.category && i.supplier && typeof i.amount === 'number'));
+        }
+        // Filter på söktext
+        if (searchText.trim()) {
+          const lower = searchText.trim().toLowerCase();
+          filteredItems = filteredItems.filter(i =>
+            (i.displayId || i.id || '').toLowerCase().includes(lower) ||
+            (i.name || '').toLowerCase().includes(lower) ||
+            (i.type || '').toLowerCase().includes(lower) ||
+            getCategoryName(i.category).toLowerCase().includes(lower) ||
+            getSupplierName(i.supplier).toLowerCase().includes(lower) ||
+            (i.note || '').toLowerCase().includes(lower)
+          );
+        }
+        // Batch-hantering state
+        const [selectedIds, setSelectedIds] = useState<string[]>([]);
+        const allFilteredIds = filteredItems.map(i => i.id);
+        const allSelected = selectedIds.length === allFilteredIds.length && allFilteredIds.length > 0;
+        const toggleSelectAll = () => {
+          setSelectedIds(allSelected ? [] : allFilteredIds);
+        };
+        const toggleSelectOne = (id: string) => {
+          setSelectedIds(selectedIds.includes(id)
+            ? selectedIds.filter(x => x !== id)
+            : [...selectedIds, id]
+          );
+        };
+        const handleBatchDelete = async () => {
+          if (selectedIds.length === 0) return;
+          for (const id of selectedIds) {
+            await useEconomyStore.getState().deleteItem(id);
+          }
+          setSelectedIds([]);
+          fetchItems();
+          setToast({ message: `${selectedIds.length} poster raderade!`, type: 'success' });
+        };
+        const totalIncome = filteredItems.filter(i => i.type === 'income').reduce((sum, i) => sum + (typeof i.amount === 'number' ? i.amount : 0), 0);
+        const totalExpense = filteredItems.filter(i => i.type === 'expense').reduce((sum, i) => sum + (typeof i.amount === 'number' ? i.amount : 0), 0);
+        const net = totalIncome - totalExpense;
       // Modal för notering
       const [showNoteModal, setShowNoteModal] = useState(false);
       const [noteModalContent, setNoteModalContent] = useState('');
+      // Modal för import
+      const [showImportModal, setShowImportModal] = useState(false);
       // Undo state
       const [undoData, setUndoData] = useState<{ item: EconomyItem, type: 'delete' | 'edit', prev?: EconomyItem } | null>(null);
-      const [undoTimeout, setUndoTimeout] = useState<number | null>(null);
+      const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+       // Exportera poster som CSV
+       const exportToCSV = () => {
+         const csvHeaders = [
+           'ID', 'Namn', 'Typ', 'Kategori', 'Leverantör', 'Belopp', 'Månad', 'År', 'Notering'
+         ];
+         const rows = items.map(item => [
+           item.displayId || item.id || '',
+           item.name || '',
+           item.type === 'income' ? 'Inkomst' : 'Utgift',
+           getCategoryName(item.category),
+           getSupplierName(item.supplier),
+           typeof item.amount === 'number' ? item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+           item.month ? item.month.toString().padStart(2, '0') : '',
+           item.year || '',
+           item.note || ''
+         ]);
+         const csvContent = [csvHeaders, ...rows]
+           .map(row => row.map(field => '"' + String(field).replace(/"/g, '""') + '"').join(';'))
+           .join('\r\n');
+         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+         const url = URL.createObjectURL(blob);
+         const link = document.createElement('a');
+         link.href = url;
+         link.setAttribute('download', 'ekonomihantering.csv');
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+         URL.revokeObjectURL(url);
+       };
     // Hjälpfunktioner för att slå upp namn
     const getCategoryName = (id: string) => {
       const cat = categories.find(cat => cat.id === id || cat.name === id);
@@ -63,9 +183,6 @@ const EconomyPage: React.FC = () => {
     _setSelectedSupplier(id);
     localStorage.setItem('selectedSupplier', id);
   };
-  const { categories, addCategory, error, loading, fetchCategories } = useCategoryStore();
-  const { suppliers, addSupplier, fetchSuppliers } = useSupplierStore();
-  const { items, addItem, fetchItems } = useEconomyStore();
 
   // Visa alla leverantörer, men dropdown är disabled tills kategori är vald
   const allSuppliers = suppliers;
@@ -121,7 +238,7 @@ const EconomyPage: React.FC = () => {
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newSupplierName.trim()) {
-      await addSupplier(newSupplierName.trim());
+      await addSupplier(newSupplierName.trim(), selectedCategory);
       setToast({ message: 'Leverantör skapad!', type: 'success' });
       setShowSupplierModal(false);
       setNewSupplierName('');
@@ -218,10 +335,65 @@ const EconomyPage: React.FC = () => {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6 text-blue-700 dark:text-blue-300">Ekonomihantering</h1>
-      {/* Formulär med kategori/leverantör-dropdowns och plus-knapp */}
-      {/* Ingen vanlig toast, endast UndoToast används nu */}
+      {/* Filter för månad och år */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex gap-1 flex-wrap">
+          {monthLabels.map((label, idx) => (
+            <button
+              key={label}
+              type="button"
+              className={`px-3 py-1 rounded shadow text-xs font-semibold border transition-all ${
+                idx === 0
+                  ? selectedMonths.length === 12 ? 'bg-blue-700 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-white'
+                  : selectedMonths.includes(String(idx).padStart(2, '0')) ? 'bg-blue-700 text-white' : 'bg-gray-200 dark:bg-slate-700 dark:text-white'
+              }`}
+              onClick={() => handleMonthClick(idx)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <select
+          className="p-2 rounded border dark:bg-slate-800 dark:text-white"
+          value={selectedYear}
+          onChange={e => setSelectedYear(e.target.value)}
+        >
+          {allYears.map(y => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+      {/* Summeringsrutor */}
+      <EconomySummary
+        income={totalIncome}
+        expense={totalExpense}
+        net={net}
+        selectedMonths={selectedMonths}
+        selectedYear={selectedYear}
+      />
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow mb-8">
-        <h2 className="font-semibold mb-4">Lägg till ny post</h2>
+        <ImportCsvModal open={showImportModal} onClose={() => setShowImportModal(false)} />
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold">Lägg till ny post</h2>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+              style={{ minWidth: 120 }}
+              onClick={exportToCSV}
+            >
+              Exportera till CSV
+            </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+              style={{ minWidth: 120 }}
+              onClick={() => setShowImportModal(true)}
+            >
+              Importera CSV
+            </button>
+          </div>
+        </div>
         <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={async e => {
           e.preventDefault();
           if (!name || !amount || !type || !month || !selectedCategory || !selectedSupplier) {
@@ -255,7 +427,7 @@ const EconomyPage: React.FC = () => {
             <option value="income">Inkomst</option>
             <option value="expense">Utgift</option>
           </select>
-          <input type="month" className="p-2 rounded border dark:bg-slate-800 dark:text-white" required value={month} onChange={e => setMonth(e.target.value)} />
+          <MonthPicker value={month} onChange={e => setMonth(e.target.value)} />
           <div className="flex items-center gap-2">
             <select
               className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full"
@@ -290,6 +462,46 @@ const EconomyPage: React.FC = () => {
             <button type="button" className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(true)} disabled={!selectedCategory}>+</button>
           </div>
           <textarea placeholder="Notering" className="p-2 rounded border dark:bg-slate-800 dark:text-white md:col-span-2" value={note} onChange={e => setNote(e.target.value)} />
+          {/* Filterblock flyttad hit, ovanför Lägg till-knappen */}
+          <div className="bg-white dark:bg-slate-800 rounded p-4 mb-6 flex flex-wrap gap-4 items-center md:col-span-2">
+            <input
+              type="text"
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white w-48"
+              placeholder="Sök..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+            />
+            <select
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white"
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+            >
+              <option value="">Alla kategorier</option>
+              {categories.map(cat => (
+                <option key={cat.id || cat.name} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+            <select
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white"
+              value={filterSupplier}
+              onChange={e => setFilterSupplier(e.target.value)}
+              disabled={!filterCategory}
+            >
+              <option value="">Alla leverantörer</option>
+              {suppliers.map(sup => (
+                <option key={sup.id || sup.name} value={sup.id}>{sup.name}</option>
+              ))}
+            </select>
+            <select
+              className="p-2 rounded border dark:bg-slate-900 dark:text-white"
+              value={filterValid}
+              onChange={e => setFilterValid(e.target.value)}
+            >
+              <option value="all">Alla poster</option>
+              <option value="valid">Endast giltiga</option>
+              <option value="invalid">Endast ogiltiga</option>
+            </select>
+          </div>
           <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 md:col-span-2">Lägg till</button>
         </form>
         {/* Modal för ny kategori */}
@@ -350,82 +562,133 @@ const EconomyPage: React.FC = () => {
       </div>
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow">
         <h2 className="font-semibold mb-4">Transaktioner</h2>
-        {items.length === 0 ? (
-          <div className="text-gray-500">Inga poster sparade ännu.</div>
+        {filteredItems.length === 0 ? (
+          <div className="text-gray-500">Inga poster sparade för valt filter.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-blue-100 dark:bg-slate-800">
-                  <th className="px-2 py-1">Månad</th>
-                  <th className="px-2 py-1">ID</th>
-                  <th className="px-2 py-1">Namn</th>
-                  <th className="px-2 py-1">Typ</th>
-                  <th className="px-2 py-1">Kategori</th>
-                  <th className="px-2 py-1">Leverantör</th>
-                  <th className="px-2 py-1">Belopp</th>
-                  <th className="px-2 py-1">Bild</th>
-                  <th className="px-2 py-1">Notering</th>
-                  <th className="px-2 py-1">Åtgärder</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items
-                  .filter(item => /^[a-fA-F0-9]{24}$/.test(item.id))
-                  .filter(item => item.name && item.category && item.supplier && typeof item.amount === 'number')
-                  .map((item, index) => (
-                  <tr key={(item.id || '') + '-' + index} className="border-b text-center hover:bg-blue-100 transition-colors">
-                    <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
-                    <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
-                     <td className="px-2 py-1 text-center hover:bg-blue-100">{item.name}</td>
-                    <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
-                    <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
-                    <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
-                    <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr</td>
-                    <td className="px-2 py-1 text-center">
-                      <span
-                        className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        title={item.images && item.images.length > 0 ? `${item.images.length} bild${item.images.length > 1 ? 'er' : ''} bifogad` : 'Inga bilder'}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontWeight: 'bold', fontSize: '0.85rem' }}
-                        onClick={async () => {
-                          setSelectedItem(item);
-                          setShowImageModal(true);
-                          setImageLoading(true);
-                          try {
-                            const imgs = await getImages(item.id, 'economy');
-                            setImageList(imgs);
-                            setImageError('');
-                          } catch (err: any) {
-                            setImageError('Kunde inte hämta bilder');
-                          }
-                          setImageLoading(false);
-                        }}
-                      >
-                        {item.images && item.images.length > 0 ? (
-                          <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>{item.images.length}</span>
-                        ) : null}
-                      </span>
-                          {/* Modal för bildhantering */}
-                          {showImageModal && selectedItem && (
-                            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                              <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-[500px] max-h-[80vh] overflow-y-auto relative">
-                                <h3 className="font-semibold mb-2">Bilder för post: {selectedItem.displayId}</h3>
-                                {imageError && <div className="text-red-600 mb-2">{imageError}</div>}
-                                <div
-                                  className="border-2 border-dashed rounded p-4 mb-4 text-center cursor-pointer bg-gray-50"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-                                  onDrop={async e => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const files = Array.from(e.dataTransfer.files);
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                id="selectAll"
+              />
+              <label htmlFor="selectAll" className="text-sm font-semibold">Markera alla</label>
+              <button
+                type="button"
+                className="px-3 py-1 bg-red-600 text-white rounded shadow hover:bg-red-700 ml-2"
+                disabled={selectedIds.length === 0}
+                onClick={handleBatchDelete}
+              >
+                Radera markerade
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-blue-100 dark:bg-slate-800">
+                    <th className="px-2 py-1 text-center">
+                      {/* Tomt för checkbox */}
+                    </th>
+                    <th className="px-2 py-1">Månad</th>
+                    <th className="px-2 py-1">ID</th>
+                    <th className="px-2 py-1">Namn</th>
+                    <th className="px-2 py-1">Typ</th>
+                    <th className="px-2 py-1">Kategori</th>
+                    <th className="px-2 py-1">Leverantör</th>
+                    <th className="px-2 py-1">Belopp</th>
+                    <th className="px-2 py-1">Bild</th>
+                    <th className="px-2 py-1">Notering</th>
+                    <th className="px-2 py-1">Åtgärder</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems
+                    .filter(item => /^[a-fA-F0-9]{24}$/.test(item.id))
+                    .filter(item => item.name && item.category && item.supplier && typeof item.amount === 'number')
+                    .map((item, index) => (
+                    <tr key={(item.id || '') + '-' + index} className="border-b text-center hover:bg-blue-100 transition-colors">
+                      <td className="px-2 py-1 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => toggleSelectOne(item.id)}
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-center">{`${item.year}-${item.month.toString().padStart(2, '0')}`}</td>
+                      <td className="px-2 py-1 text-center">{item.displayId ? item.displayId : 'Okänd'}</td>
+                      <td className="px-2 py-1 text-center hover:bg-blue-100">{item.name}</td>
+                      <td className="px-2 py-1 text-center">{item.type === 'income' ? 'Inkomst' : 'Utgift'}</td>
+                      <td className="px-2 py-1 text-center">{getCategoryName(item.category)}</td>
+                      <td className="px-2 py-1 text-center">{getSupplierName(item.supplier)}</td>
+                      <td className={`px-2 py-1 text-center font-mono ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr</td>
+                      <td className="px-2 py-1 text-center">
+                        <span
+                          className={`inline-block w-4 h-4 rounded-full ${item.images && item.images.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={item.images && item.images.length > 0 ? `${item.images.length} bild${item.images.length > 1 ? 'er' : ''} bifogad` : 'Inga bilder'}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontWeight: 'bold', fontSize: '0.85rem' }}
+                          onClick={async () => {
+                            setSelectedItem(item);
+                            setShowImageModal(true);
+                            setImageLoading(true);
+                            try {
+                              const imgs = await getImages(item.id, 'economy');
+                              setImageList(imgs);
+                              setImageError('');
+                            } catch (err: any) {
+                              setImageError('Kunde inte hämta bilder');
+                            }
+                            setImageLoading(false);
+                          }}
+                        >
+                          {item.images && item.images.length > 0 ? (
+                            <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>{item.images.length}</span>
+                          ) : null}
+                        </span>
+                        {/* Modal för bildhantering */}
+                        {showImageModal && selectedItem && selectedItem.id === item.id && (
+                          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded shadow w-[500px] max-h-[80vh] overflow-y-auto relative">
+                              <h3 className="font-semibold mb-2">Bilder för post: {selectedItem.displayId}</h3>
+                              {imageError && <div className="text-red-600 mb-2">{imageError}</div>}
+                              <div
+                                className="border-2 border-dashed rounded p-4 mb-4 text-center cursor-pointer bg-gray-50"
+                                onClick={() => fileInputRef.current?.click()}
+                                onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                                onDrop={async e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const files = Array.from(e.dataTransfer.files);
+                                  setImageLoading(true);
+                                  try {
+                                    await uploadImage(selectedItem.id, files as File[], 'economy');
+                                    const imgs = await getImages(selectedItem.id, 'economy');
+                                    setImageList(imgs);
+                                    setImageError('');
+                                    useEconomyStore.setState(state => ({
+                                      items: state.items.map(i =>
+                                        i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                      )
+                                    }));
+                                  } catch (err: any) {
+                                    setImageError('Kunde inte ladda upp bilder');
+                                  }
+                                  setImageLoading(false);
+                                }}
+                              >
+                                <input
+                                  type="file"
+                                  multiple
+                                  ref={fileInputRef}
+                                  style={{ display: 'none' }}
+                                  onChange={async e => {
+                                    if (!e.target.files) return;
                                     setImageLoading(true);
                                     try {
-                                      await uploadImage(selectedItem.id, files as File[], 'economy');
+                                      await uploadImage(selectedItem.id, Array.from(e.target.files), 'economy');
                                       const imgs = await getImages(selectedItem.id, 'economy');
                                       setImageList(imgs);
                                       setImageError('');
-                                      // Uppdatera images-arrayen för rätt item i Zustand-store
                                       useEconomyStore.setState(state => ({
                                         items: state.items.map(i =>
                                           i.id === selectedItem.id ? { ...i, images: imgs } : i
@@ -436,128 +699,86 @@ const EconomyPage: React.FC = () => {
                                     }
                                     setImageLoading(false);
                                   }}
-                                >
-                                  <input
-                                    type="file"
-                                    multiple
-                                    ref={fileInputRef}
-                                    style={{ display: 'none' }}
-                                    onChange={async e => {
-                                      if (!e.target.files) return;
-                                      setImageLoading(true);
-                                      try {
-                                        await uploadImage(selectedItem.id, Array.from(e.target.files), 'economy');
-                                        const imgs = await getImages(selectedItem.id, 'economy');
-                                        setImageList(imgs);
-                                        setImageError('');
-                                        // Uppdatera images-arrayen för rätt item i Zustand-store
-                                        useEconomyStore.setState(state => ({
-                                          items: state.items.map(i =>
-                                            i.id === selectedItem.id ? { ...i, images: imgs } : i
-                                          )
-                                        }));
-                                      } catch (err: any) {
-                                        setImageError('Kunde inte ladda upp bilder');
-                                      }
-                                      setImageLoading(false);
-                                    }}
-                                  />
-                                  <span className="text-gray-600">Dra in bilder här eller klicka för att välja filer</span>
-                                </div>
-                                <div className="flex flex-wrap gap-3 mb-4">
-                                  {imageLoading ? <span>Laddar bilder...</span> : null}
-                                  {imageList.length === 0 && !imageLoading ? <span className="text-gray-400">Inga bilder uppladdade.</span> : null}
-                                  {imageList.map(img => (
-                                    <div key={img} className="relative group">
-                                      <img
-                                        src={img}
-                                        alt="thumbnail"
-                                        className="w-20 h-20 object-cover rounded shadow cursor-pointer border border-gray-300"
-                                        onClick={() => setOverlayImage(img)}
-                                      />
-                                      <button
-                                        className="absolute top-1 right-1 bg-red-600 text-white rounded px-2 py-1 text-xs opacity-80 group-hover:opacity-100"
-                                        title="Ta bort bild"
-                                        onClick={async e => {
-                                          e.stopPropagation();
-                                          setImageLoading(true);
-                                          try {
-                                            const filename = img.split('/').pop() || img;
-                                            await deleteImage(selectedItem.id, filename, 'economy');
-                                            const imgs = await getImages(selectedItem.id, 'economy');
-                                            setImageList(imgs);
-                                            setImageError('');
-                                            useEconomyStore.setState(state => ({
-                                              items: state.items.map(i =>
-                                                i.id === selectedItem.id ? { ...i, images: imgs } : i
-                                              )
-                                            }));
-                                            // Visa UndoToast för bildradering
-                                            setToast({ message: 'Bild raderad!', type: 'error' });
-                                            setTimeout(() => setToast(null), 3000);
-                                          } catch (err: any) {
-                                            setImageError('Kunde inte ta bort bild');
-                                          }
-                                          setImageLoading(false);
-                                        }}
-                                      >🗑️</button>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="flex gap-2 justify-end mt-4">
-                                  <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowImageModal(false); setSelectedItem(null); setImageList([]); setOverlayImage(null); }}>Stäng</button>
-                                </div>
-                                {/* Overlay för stor bild */}
-                                {overlayImage && (
-                                  <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setOverlayImage(null)}>
-                                    <img src={overlayImage} alt="stor bild" className="max-w-[80vw] max-h-[80vh] rounded shadow-lg" />
-                                  </div>
-                                )}
+                                />
+                                <span className="text-gray-600">Dra in bilder här eller klicka för att välja filer</span>
                               </div>
+                              <div className="flex flex-wrap gap-3 mb-4">
+                                {imageLoading ? <span>Laddar bilder...</span> : null}
+                                {imageList.length === 0 && !imageLoading ? <span className="text-gray-400">Inga bilder uppladdade.</span> : null}
+                                {imageList.map(img => (
+                                  <div key={img} className="relative group">
+                                    <img
+                                      src={img}
+                                      alt="thumbnail"
+                                      className="w-20 h-20 object-cover rounded shadow cursor-pointer border border-gray-300"
+                                      onClick={() => setOverlayImage(img)}
+                                    />
+                                    <button
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded px-2 py-1 text-xs opacity-80 group-hover:opacity-100"
+                                      title="Ta bort bild"
+                                      onClick={async e => {
+                                        e.stopPropagation();
+                                        setImageLoading(true);
+                                        try {
+                                          const filename = img.split('/').pop() || img;
+                                          await deleteImage(selectedItem.id, filename, 'economy');
+                                          const imgs = await getImages(selectedItem.id, 'economy');
+                                          setImageList(imgs);
+                                          setImageError('');
+                                          useEconomyStore.setState(state => ({
+                                            items: state.items.map(i =>
+                                              i.id === selectedItem.id ? { ...i, images: imgs } : i
+                                            )
+                                          }));
+                                          setToast({ message: 'Bild raderad!', type: 'error' });
+                                          setTimeout(() => setToast(null), 3000);
+                                        } catch (err: any) {
+                                          setImageError('Kunde inte ta bort bild');
+                                        }
+                                        setImageLoading(false);
+                                      }}
+                                    >🗑️</button>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex gap-2 justify-end mt-4">
+                                <button type="button" className="px-3 py-1 bg-gray-300 rounded" onClick={() => { setShowImageModal(false); setSelectedItem(null); setImageList([]); setOverlayImage(null); }}>Stäng</button>
+                              </div>
+                              {/* Overlay för stor bild */}
+                              {overlayImage && (
+                                <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setOverlayImage(null)}>
+                                  <img src={overlayImage} alt="stor bild" className="max-w-[80vw] max-h-[80vh] rounded shadow-lg" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                    </td>
-                    <td className="px-2 py-1 text-center" style={{ position: 'relative' }}>
-                      <span
-                        className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
-                        onClick={() => { setNoteModalContent(item.note || ''); setShowNoteModal(true); }}
-                        onMouseEnter={e => {
-                          const tooltip = document.createElement('div');
-                          tooltip.innerText = item.note || 'Ingen notering';
-                          tooltip.style.position = 'fixed';
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          tooltip.style.top = `${rect.top - 40}px`;
-                          tooltip.style.left = `${rect.left + rect.width / 2}px`;
-                          tooltip.style.transform = 'translateX(-50%)';
-                          tooltip.style.background = '#fff';
-                          tooltip.style.color = '#222';
-                          tooltip.style.padding = '6px 12px';
-                          tooltip.style.borderRadius = '6px';
-                          tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                          tooltip.style.zIndex = '9999';
-                          tooltip.className = 'note-tooltip';
-                          document.body.appendChild(tooltip);
-                        }}
-                        onMouseLeave={e => {
-                          const tooltips = document.querySelectorAll('.note-tooltip');
-                          tooltips.forEach(t => t.remove());
-                        }}
-                      />
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => openEditModal(item)}>
-                        <span role="img" aria-label="edit">✏️</span>
-                      </button>
-                      <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => openDeleteModal(item)}>
-                        <span role="img" aria-label="delete">🗑️</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1 text-center" style={{ position: 'relative' }}>
+                        <span
+                          className={`inline-block w-4 h-4 rounded-full ${item.note && item.note.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                          onClick={() => { setNoteModalContent(item.note || ''); setShowNoteModal(true); }}
+                        >
+                          {item.note && item.note.length > 0 ? (
+                            <span style={{ color: 'white', fontWeight: 700, lineHeight: 1 }}>i</span>
+                          ) : null}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1 text-center">
+                        <button className="px-2 py-1 bg-gray-300 rounded mr-2" title="Redigera" onClick={() => openEditModal(item)}>
+                          <span role="img" aria-label="edit">✏️</span>
+                        </button>
+                        <button className="px-2 py-1 bg-gray-300 rounded" title="Radera" onClick={() => openDeleteModal(item)}>
+                          <span role="img" aria-label="delete">🗑️</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       {/* Modal för notering */}
       {showNoteModal && (
@@ -617,7 +838,7 @@ const EconomyPage: React.FC = () => {
               <option value="income">Inkomst</option>
               <option value="expense">Utgift</option>
             </select>
-            <input type="month" className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editMonth} onChange={e => setEditMonth(e.target.value)} />
+            <MonthPicker value={editMonth} onChange={e => setEditMonth(e.target.value)} />
             <select className="p-2 rounded border dark:bg-slate-800 dark:text-white w-full mb-2" required value={editCategory} onChange={e => setEditCategory(e.target.value)}>
               <option value="">Välj kategori</option>
               {categories.map(cat => (

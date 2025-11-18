@@ -10,14 +10,16 @@ interface CategoryState {
   categories: Category[];
   loading: boolean;
   error: string;
+  selectedCategory?: string;
   fetchCategories: () => Promise<void>;
-    addCategory: (name: string) => Promise<any>;
+  addCategory: (name: string) => Promise<any>;
 }
 
 export const useCategoryStore = create<CategoryState>((set, get) => ({
   categories: [],
   loading: false,
   error: '',
+  selectedCategory: undefined,
   fetchCategories: async () => {
     set({ loading: true, error: '' });
     try {
@@ -27,7 +29,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       // Sätt default selectedCategory om ingen är vald och data finns
       if (data.length > 0) {
         set(state => ({
-          selectedCategory: state.selectedCategory && data.find(cat => cat.id === state.selectedCategory) ? state.selectedCategory : data[0].id
+          selectedCategory: state.selectedCategory && data.find((cat: Category) => cat.id === state.selectedCategory) ? state.selectedCategory : data[0].id
         }));
         console.log('selectedCategory set to', data[0].id);
       }

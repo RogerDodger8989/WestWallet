@@ -6,15 +6,11 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-  async create(@Body() body: { name: string }) {
-    try {
-      return await this.categoriesService.create(body.name);
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        return { statusCode: 400, message: error.message };
-      }
-      throw error;
+  async create(@Body() body: { name?: string }) {
+    if (!body || typeof body.name !== 'string' || !body.name.trim()) {
+      throw new BadRequestException('Kategori-namn krävs');
     }
+    return await this.categoriesService.create(body.name.trim());
   }
 
   @Get()
