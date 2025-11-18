@@ -20,29 +20,65 @@ const internalFields = [
 ];
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
-      // Modal för att skapa kategori/leverantör
-      const handleAddCatModal = async () => {
-        if (!addCatModal.input.trim() || addCatModal.row === null) return;
-        await addCategory(addCatModal.input.trim());
-        await fetchCategories();
-        const latestCat = categories[categories.length-1];
-        if (latestCat) {
-          setRowCategory(rc => ({...rc, [addCatModal.row]: latestCat.id}));
-        }
-        setAddCatModal({open: false, row: null, input: ""});
+        // Modal state för ny kategori/leverantör
+        const [showCategoryModal, setShowCategoryModal] = useState(false);
+        const [showSupplierModal, setShowSupplierModal] = useState(false);
+        const [modalCategoryName, setModalCategoryName] = useState("");
+        const [modalSupplierName, setModalSupplierName] = useState("");
+        const [modalRowIdx, setModalRowIdx] = useState<number|null>(null);
+        const [modalSupplierCategoryId, setModalSupplierCategoryId] = useState<string>("");
+
+        // Modal för ny kategori
+        const openCategoryModal = (rowIdx: number) => {
+          setModalRowIdx(rowIdx);
+          setModalCategoryName("");
+          setShowCategoryModal(true);
+        };
+        const handleCreateCategoryRow = async () => {
+          if (!modalCategoryName.trim()) return;
+          const res = await addCategory(modalCategoryName.trim());
+          if (res && modalRowIdx !== null) {
+            await fetchCategories();
+            setRowCategory(prev => ({ ...prev, [modalRowIdx!]: res.id }));
+            setShowCategoryModal(false);
+            setModalCategoryName("");
+            setModalRowIdx(null);
+          }
+        };
+        // Modal för ny leverantör
+        const openSupplierModal = (rowIdx: number, categoryId: string) => {
+          setModalRowIdx(rowIdx);
+          setModalSupplierName("");
+          setModalSupplierCategoryId(categoryId);
+          setShowSupplierModal(true);
+        };
+        const handleCreateSupplierRow = async () => {
+          if (!modalSupplierName.trim() || !modalSupplierCategoryId) return;
+          await addSupplier(modalSupplierName.trim(), modalSupplierCategoryId);
+          await fetchSuppliers();
+          if (modalRowIdx !== null) {
+            // Hämta nya supplierId
+            const newSupplier = suppliers.find(sup => sup.name === modalSupplierName.trim() && sup.categoryId === modalSupplierCategoryId);
+            if (newSupplier) {
+              setRowSupplier(prev => ({ ...prev, [modalRowIdx!]: newSupplier.id }));
+            }
+            setShowSupplierModal(false);
+            setModalSupplierName("");
+            setModalRowIdx(null);
+            setModalSupplierCategoryId("");
+          }
+        };
+      // Per-rad kategori/leverantör state
+      const [rowCategory, setRowCategory] = useState<{[row: number]: string}>({});
+      const [rowSupplier, setRowSupplier] = useState<{[row: number]: string}>({});
+      // Hantera kategori/supplier per rad
+      const handleRowCategoryChange = (rowIdx: number, categoryId: string) => {
+        setRowCategory(prev => ({ ...prev, [rowIdx]: categoryId }));
+        // Nollställ leverantör om kategori ändras
+        setRowSupplier(prev => ({ ...prev, [rowIdx]: "" }));
       };
-      const handleAddSupModal = async () => {
-        if (!addSupModal.input.trim() || addSupModal.row === null) return;
-        const catId = rowCategory[addSupModal.row];
-        if (!catId) return;
-        await addSupplier(addSupModal.input.trim(), catId);
-        await fetchSuppliers();
-        const filtered = suppliers.filter(sup => sup.categoryId === catId);
-        const latestSup = filtered[filtered.length-1];
-        if (latestSup) {
-          setRowSupplier(rs => ({...rs, [addSupModal.row]: latestSup.id}));
-        }
-        setAddSupModal({open: false, row: null, input: ""});
+      const handleRowSupplierChange = (rowIdx: number, supplierId: string) => {
+        setRowSupplier(prev => ({ ...prev, [rowIdx]: supplierId }));
       };
     // Regelhantering
     const [rules, setRules] = useState<{ contains: string; category: string; supplier?: string }[]>([]);
@@ -105,12 +141,6 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   const [importResults, setImportResults] = useState<Array<{row: number; success: boolean; error?: string}>>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSupplierName, setNewSupplierName] = useState("");
-  // Per-row kategori/leverantör
-  const [rowCategory, setRowCategory] = useState<{[i:number]: string}>({});
-  const [rowSupplier, setRowSupplier] = useState<{[i:number]: string}>({});
-  // Modal state för ny kategori/leverantör per rad
-  const [addCatModal, setAddCatModal] = useState<{open: boolean, row: number|null, input: string}>({open: false, row: null, input: ""});
-  const [addSupModal, setAddSupModal] = useState<{open: boolean, row: number|null, input: string}>({open: false, row: null, input: ""});
 
   // Category store
   const categories = useCategoryStore(state => state.categories);
@@ -208,13 +238,12 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
       const row = csvData[i];
       // Find rule for row
       const matchedRule = getMatchedRule(row);
-      // Per-row kategori/leverantör
-      const category = rowCategory[i] || matchedRule?.category || selectedCategory || "okategoriserad";
-      const supplier = rowSupplier[i] || matchedRule?.supplier || selectedSupplier || "okänd";
+      const category = matchedRule?.category || selectedCategory || "okategoriserad";
+      const supplier = matchedRule?.supplier || selectedSupplier || "okänd";
       return {
         name: row[fieldMapping.description] || row["Beskrivning"] || "",
         amount: Number(row[fieldMapping.amount] || row["Belopp"] || 0),
-        type: 'expense' as 'expense',
+        type: "expense",
         category,
         supplier,
         note: row[fieldMapping.reference] || row["Referens"] || "",
@@ -241,11 +270,9 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
       setImportToast(`Import färdig! ${results.filter(r=>r.success).length} av ${results.length} rader importerade.`);
       setImporting(false);
       setSelectedRows([]);
-      setTimeout(() => {
-        setImportToast("");
-        setImportResults([]);
-        onClose();
-      }, 3000);
+      setImportToast("");
+      setImportResults([]);
+      onClose();
     });
   };
 
@@ -287,7 +314,7 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-transparent backdrop-blur flex items-center justify-center z-[100]">
       <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-4xl relative flex flex-col" style={{maxHeight: '90vh'}}>
         <button
           className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
@@ -297,48 +324,6 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
           &times;
         </button>
         <div className="overflow-y-auto flex-1">
-          {/* Modal för ny kategori */}
-          {addCatModal.open && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs flex flex-col gap-4">
-                <div className="font-semibold">Ny kategori</div>
-                <input
-                  type="text"
-                  className="border rounded px-2 py-1"
-                  value={addCatModal.input}
-                  onChange={e => setAddCatModal(m => ({...m, input: e.target.value}))}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddCatModal(); }}
-                  placeholder="Kategori-namn"
-                  autoFocus
-                />
-                <div className="flex gap-2 justify-end">
-                  <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setAddCatModal({open:false,row:null,input:""})}>Avbryt</button>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={handleAddCatModal} disabled={!addCatModal.input.trim()}>Lägg till</button>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* Modal för ny leverantör */}
-          {addSupModal.open && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs flex flex-col gap-4">
-                <div className="font-semibold">Ny leverantör</div>
-                <input
-                  type="text"
-                  className="border rounded px-2 py-1"
-                  value={addSupModal.input}
-                  onChange={e => setAddSupModal(m => ({...m, input: e.target.value}))}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddSupModal(); }}
-                  placeholder="Leverantörs-namn"
-                  autoFocus
-                />
-                <div className="flex gap-2 justify-end">
-                  <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setAddSupModal({open:false,row:null,input:""})}>Avbryt</button>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={handleAddSupModal} disabled={!addSupModal.input.trim()}>Lägg till</button>
-                </div>
-              </div>
-            </div>
-          )}
           {/* CSV-import */}
           <div className="mb-4">
             <label className="block mb-2 font-semibold">Importera CSV-fil:</label>
@@ -509,10 +494,11 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                           onChange={handleSelectAll}
                         />
                       </th>
-                      {/* Only show columns that are mapped to an internal field */}
                       {csvHeaders.filter(col => fieldMapping[col]).map((col) => (
                         <th key={col} className="border px-2 py-1 bg-gray-100">{col}</th>
                       ))}
+                      <th className="border px-2 py-1 bg-gray-100">Kategori</th>
+                      <th className="border px-2 py-1 bg-gray-100">Leverantör</th>
                       <th className="border px-2 py-1 bg-gray-100">Status</th>
                       <th className="border px-2 py-1 bg-gray-100">Regel</th>
                     </tr>
@@ -521,6 +507,9 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                     {csvData.map((row, i) => {
                       const duplicate = isDuplicate(row);
                       const matchedRule = getMatchedRule(row);
+                      // Per-rad kategori/leverantör state
+                      const categoryId = rowCategory[i] || matchedRule?.category || "";
+                      const supplierId = rowSupplier[i] || matchedRule?.supplier || "";
                       return (
                         <tr key={i} className={duplicate ? "bg-gray-200" : matchedRule ? "bg-blue-50" : ""}>
                           <td className={"border px-2 py-1 text-center " + (duplicate ? "bg-gray-100" : "") }>
@@ -535,13 +524,13 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                           {csvHeaders.filter(col => fieldMapping[col]).map((col) => (
                             <td key={col} className="border px-2 py-1">{row[col]}</td>
                           ))}
-                          {/* Per-row kategori */}
+                          {/* Kategori-dropdown per rad med + */}
                           <td className="border px-2 py-1">
                             <div className="flex items-center gap-1">
                               <select
                                 className="border rounded px-2 py-1"
-                                value={rowCategory[i] || ""}
-                                onChange={e => setRowCategory(rc => ({...rc, [i]: e.target.value}))}
+                                value={categoryId}
+                                onChange={e => handleRowCategoryChange(i, e.target.value)}
                               >
                                 <option value="">Välj kategori</option>
                                 {categories.map(cat => (
@@ -550,33 +539,74 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                               </select>
                               <button
                                 className="px-2 py-1 bg-blue-600 text-white rounded"
-                                onClick={() => setAddCatModal({open: true, row: i, input: ""})}
-                              >+
-                              </button>
+                                onClick={() => openCategoryModal(i)}
+                                title="Skapa ny kategori"
+                              >+</button>
                             </div>
                           </td>
-                          {/* Per-row leverantör */}
+                          {/* Leverantör-dropdown per rad med + */}
                           <td className="border px-2 py-1">
                             <div className="flex items-center gap-1">
                               <select
                                 className="border rounded px-2 py-1"
-                                value={rowSupplier[i] || ""}
-                                onChange={e => setRowSupplier(rs => ({...rs, [i]: e.target.value}))}
-                                disabled={!rowCategory[i]}
+                                value={supplierId}
+                                onChange={e => handleRowSupplierChange(i, e.target.value)}
+                                disabled={!categoryId}
                               >
                                 <option value="">Välj leverantör</option>
-                                {suppliers.filter(sup => sup.categoryId === rowCategory[i]).map(sup => (
+                                {suppliers.filter(sup => sup.categoryId === categoryId).map(sup => (
                                   <option key={sup.id} value={sup.id}>{sup.name}</option>
                                 ))}
                               </select>
                               <button
                                 className="px-2 py-1 bg-blue-600 text-white rounded"
-                                onClick={() => setAddSupModal({open: true, row: i, input: ""})}
-                                disabled={!rowCategory[i]}
-                              >+
-                              </button>
+                                onClick={() => openSupplierModal(i, categoryId)}
+                                title="Skapa ny leverantör"
+                                disabled={!categoryId}
+                              >+</button>
                             </div>
                           </td>
+                                        {/* Modaler för ny kategori/leverantör */}
+                                        {showCategoryModal && (
+                                          <div className="fixed inset-0 bg-transparent backdrop-blur flex items-center justify-center z-[100]">
+                                            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs flex flex-col gap-2">
+                                              <div className="font-semibold mb-2">Ny kategori</div>
+                                              <input
+                                                type="text"
+                                                className="border rounded px-2 py-1"
+                                                value={modalCategoryName}
+                                                onChange={e => setModalCategoryName(e.target.value)}
+                                                placeholder="Kategori namn"
+                                                autoFocus
+                                                onKeyDown={e => { if (e.key === 'Enter') handleCreateCategoryRow(); }}
+                                              />
+                                              <div className="flex gap-2 mt-2">
+                                                <button className="px-2 py-1 bg-blue-600 text-white rounded" onClick={handleCreateCategoryRow} disabled={!modalCategoryName.trim()}>Lägg till</button>
+                                                <button className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowCategoryModal(false)}>Avbryt</button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {showSupplierModal && (
+                                          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                                            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs flex flex-col gap-2">
+                                              <div className="font-semibold mb-2">Ny leverantör</div>
+                                              <input
+                                                type="text"
+                                                className="border rounded px-2 py-1"
+                                                value={modalSupplierName}
+                                                onChange={e => setModalSupplierName(e.target.value)}
+                                                placeholder="Leverantör namn"
+                                                autoFocus
+                                                onKeyDown={e => { if (e.key === 'Enter') handleCreateSupplierRow(); }}
+                                              />
+                                              <div className="flex gap-2 mt-2">
+                                                <button className="px-2 py-1 bg-blue-600 text-white rounded" onClick={handleCreateSupplierRow} disabled={!modalSupplierName.trim()}>Lägg till</button>
+                                                <button className="px-2 py-1 bg-gray-300 rounded" onClick={() => setShowSupplierModal(false)}>Avbryt</button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
                           <td className="border px-2 py-1 text-xs">
                             {duplicate ? <span className="text-red-600">Dubblett</span> : <span className="text-green-600">OK</span>}
                           </td>
@@ -605,8 +635,8 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                     onClick={handleImport}
                     disabled={
                       selectedRows.length === 0 ||
-                      selectedRows.every(i => isDuplicate(csvData[i])) || importing ||
-                      !selectedCategory || !selectedSupplier ||
+                      selectedRows.some(i => isDuplicate(csvData[i])) || importing ||
+                      selectedRows.some(i => !(rowCategory[i] && rowSupplier[i])) ||
                       (() => {
                         const used = Object.values(fieldMapping).filter(Boolean);
                         return used.length !== new Set(used).size;
@@ -619,14 +649,14 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                   {selectedRows.length === 0 && (
                     <span className="text-xs text-gray-500 mt-1">Välj minst en rad att importera</span>
                   )}
-                  {selectedRows.length > 0 && selectedRows.every(i => isDuplicate(csvData[i])) && (
-                    <span className="text-xs text-yellow-600 mt-1">Alla valda rader är dubletter</span>
+                  {selectedRows.length > 0 && selectedRows.some(i => isDuplicate(csvData[i])) && (
+                    <span className="text-xs text-yellow-600 mt-1">Minst en vald rad är en dubblett</span>
                   )}
-                  {!selectedCategory && (
-                    <span className="text-xs text-yellow-600 mt-1">Välj kategori innan import</span>
+                  {selectedRows.some(i => !(rowCategory[i])) && (
+                    <span className="text-xs text-yellow-600 mt-1">Välj kategori på alla valda rader</span>
                   )}
-                  {!selectedSupplier && (
-                    <span className="text-xs text-yellow-600 mt-1">Välj leverantör innan import</span>
+                  {selectedRows.some(i => !(rowSupplier[i])) && (
+                    <span className="text-xs text-yellow-600 mt-1">Välj leverantör på alla valda rader</span>
                   )}
                   {(() => {
                     const used = Object.values(fieldMapping).filter(Boolean);
