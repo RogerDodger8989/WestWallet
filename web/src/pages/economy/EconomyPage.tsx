@@ -17,7 +17,36 @@ const EconomyPage: React.FC = () => {
       const [showImportModal, setShowImportModal] = useState(false);
       // Undo state
       const [undoData, setUndoData] = useState<{ item: EconomyItem, type: 'delete' | 'edit', prev?: EconomyItem } | null>(null);
-      const [undoTimeout, setUndoTimeout] = useState<number | null>(null);
+      const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+       // Exportera poster som CSV
+       const exportToCSV = () => {
+         const csvHeaders = [
+           'ID', 'Namn', 'Typ', 'Kategori', 'Leverantör', 'Belopp', 'Månad', 'År', 'Notering'
+         ];
+         const rows = items.map(item => [
+           item.displayId || item.id || '',
+           item.name || '',
+           item.type === 'income' ? 'Inkomst' : 'Utgift',
+           getCategoryName(item.category),
+           getSupplierName(item.supplier),
+           typeof item.amount === 'number' ? item.amount.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+           item.month ? item.month.toString().padStart(2, '0') : '',
+           item.year || '',
+           item.note || ''
+         ]);
+         const csvContent = [csvHeaders, ...rows]
+           .map(row => row.map(field => '"' + String(field).replace(/"/g, '""') + '"').join(';'))
+           .join('\r\n');
+         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+         const url = URL.createObjectURL(blob);
+         const link = document.createElement('a');
+         link.href = url;
+         link.setAttribute('download', 'ekonomihantering.csv');
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+         URL.revokeObjectURL(url);
+       };
     // Hjälpfunktioner för att slå upp namn
     const getCategoryName = (id: string) => {
       const cat = categories.find(cat => cat.id === id || cat.name === id);
@@ -125,7 +154,7 @@ const EconomyPage: React.FC = () => {
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newSupplierName.trim()) {
-      await addSupplier(newSupplierName.trim());
+      await addSupplier(newSupplierName.trim(), selectedCategory);
       setToast({ message: 'Leverantör skapad!', type: 'success' });
       setShowSupplierModal(false);
       setNewSupplierName('');
@@ -235,6 +264,16 @@ const EconomyPage: React.FC = () => {
             onClick={() => setShowImportModal(true)}
           >
             Importera CSV
+          </button>
+        </div>
+        <div className="flex justify-end mb-4">
+          <button
+            type="button"
+            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+            style={{ minWidth: 120 }}
+            onClick={exportToCSV}
+          >
+            Exportera till CSV
           </button>
         </div>
           
