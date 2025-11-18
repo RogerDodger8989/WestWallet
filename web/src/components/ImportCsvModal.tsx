@@ -20,6 +20,30 @@ const internalFields = [
 ];
 
 const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
+      // Modal för att skapa kategori/leverantör
+      const handleAddCatModal = async () => {
+        if (!addCatModal.input.trim() || addCatModal.row === null) return;
+        await addCategory(addCatModal.input.trim());
+        await fetchCategories();
+        const latestCat = categories[categories.length-1];
+        if (latestCat) {
+          setRowCategory(rc => ({...rc, [addCatModal.row]: latestCat.id}));
+        }
+        setAddCatModal({open: false, row: null, input: ""});
+      };
+      const handleAddSupModal = async () => {
+        if (!addSupModal.input.trim() || addSupModal.row === null) return;
+        const catId = rowCategory[addSupModal.row];
+        if (!catId) return;
+        await addSupplier(addSupModal.input.trim(), catId);
+        await fetchSuppliers();
+        const filtered = suppliers.filter(sup => sup.categoryId === catId);
+        const latestSup = filtered[filtered.length-1];
+        if (latestSup) {
+          setRowSupplier(rs => ({...rs, [addSupModal.row]: latestSup.id}));
+        }
+        setAddSupModal({open: false, row: null, input: ""});
+      };
     // Regelhantering
     const [rules, setRules] = useState<{ contains: string; category: string; supplier?: string }[]>([]);
     // Load rules from localStorage on mount
@@ -84,8 +108,9 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   // Per-row kategori/leverantör
   const [rowCategory, setRowCategory] = useState<{[i:number]: string}>({});
   const [rowSupplier, setRowSupplier] = useState<{[i:number]: string}>({});
-  const [rowNewCategory, setRowNewCategory] = useState<{[i:number]: string}>({});
-  const [rowNewSupplier, setRowNewSupplier] = useState<{[i:number]: string}>({});
+  // Modal state för ny kategori/leverantör per rad
+  const [addCatModal, setAddCatModal] = useState<{open: boolean, row: number|null, input: string}>({open: false, row: null, input: ""});
+  const [addSupModal, setAddSupModal] = useState<{open: boolean, row: number|null, input: string}>({open: false, row: null, input: ""});
 
   // Category store
   const categories = useCategoryStore(state => state.categories);
@@ -272,6 +297,48 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
           &times;
         </button>
         <div className="overflow-y-auto flex-1">
+          {/* Modal för ny kategori */}
+          {addCatModal.open && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs flex flex-col gap-4">
+                <div className="font-semibold">Ny kategori</div>
+                <input
+                  type="text"
+                  className="border rounded px-2 py-1"
+                  value={addCatModal.input}
+                  onChange={e => setAddCatModal(m => ({...m, input: e.target.value}))}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddCatModal(); }}
+                  placeholder="Kategori-namn"
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end">
+                  <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setAddCatModal({open:false,row:null,input:""})}>Avbryt</button>
+                  <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={handleAddCatModal} disabled={!addCatModal.input.trim()}>Lägg till</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Modal för ny leverantör */}
+          {addSupModal.open && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs flex flex-col gap-4">
+                <div className="font-semibold">Ny leverantör</div>
+                <input
+                  type="text"
+                  className="border rounded px-2 py-1"
+                  value={addSupModal.input}
+                  onChange={e => setAddSupModal(m => ({...m, input: e.target.value}))}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddSupModal(); }}
+                  placeholder="Leverantörs-namn"
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end">
+                  <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setAddSupModal({open:false,row:null,input:""})}>Avbryt</button>
+                  <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={handleAddSupModal} disabled={!addSupModal.input.trim()}>Lägg till</button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* CSV-import */}
           <div className="mb-4">
             <label className="block mb-2 font-semibold">Importera CSV-fil:</label>
@@ -481,28 +548,9 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                                 ))}
                               </select>
-                              <input
-                                type="text"
-                                className="border rounded px-2 py-1 w-20"
-                                value={rowNewCategory[i] || ""}
-                                onChange={e => setRowNewCategory(rnc => ({...rnc, [i]: e.target.value}))}
-                                placeholder="Ny kategori"
-                              />
                               <button
                                 className="px-2 py-1 bg-blue-600 text-white rounded"
-                                onClick={async () => {
-                                  const name = (rowNewCategory[i]||"").trim();
-                                  if (!name) return;
-                                  await addCategory(name);
-                                  await fetchCategories();
-                                  // Välj senaste kategori
-                                  const latestCat = categories[categories.length-1];
-                                  if (latestCat) {
-                                    setRowCategory(rc => ({...rc, [i]: latestCat.id}));
-                                  }
-                                  setRowNewCategory(rnc => ({...rnc, [i]: ""}));
-                                }}
-                                disabled={!rowNewCategory[i]}
+                                onClick={() => setAddCatModal({open: true, row: i, input: ""})}
                               >+
                               </button>
                             </div>
@@ -521,31 +569,10 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                                   <option key={sup.id} value={sup.id}>{sup.name}</option>
                                 ))}
                               </select>
-                              <input
-                                type="text"
-                                className="border rounded px-2 py-1 w-20"
-                                value={rowNewSupplier[i] || ""}
-                                onChange={e => setRowNewSupplier(rns => ({...rns, [i]: e.target.value}))}
-                                placeholder="Ny leverantör"
-                                disabled={!rowCategory[i]}
-                              />
                               <button
                                 className="px-2 py-1 bg-blue-600 text-white rounded"
-                                onClick={async () => {
-                                  const name = (rowNewSupplier[i]||"").trim();
-                                  const catId = rowCategory[i];
-                                  if (!name || !catId) return;
-                                  await addSupplier(name, catId);
-                                  await fetchSuppliers();
-                                  // Välj senaste leverantör för kategori
-                                  const filtered = suppliers.filter(sup => sup.categoryId === catId);
-                                  const latestSup = filtered[filtered.length-1];
-                                  if (latestSup) {
-                                    setRowSupplier(rs => ({...rs, [i]: latestSup.id}));
-                                  }
-                                  setRowNewSupplier(rns => ({...rns, [i]: ""}));
-                                }}
-                                disabled={!rowNewSupplier[i] || !rowCategory[i]}
+                                onClick={() => setAddSupModal({open: true, row: i, input: ""})}
+                                disabled={!rowCategory[i]}
                               >+
                               </button>
                             </div>
