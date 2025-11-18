@@ -81,6 +81,11 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
   const [importResults, setImportResults] = useState<Array<{row: number; success: boolean; error?: string}>>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSupplierName, setNewSupplierName] = useState("");
+  // Per-row kategori/leverantör
+  const [rowCategory, setRowCategory] = useState<{[i:number]: string}>({});
+  const [rowSupplier, setRowSupplier] = useState<{[i:number]: string}>({});
+  const [rowNewCategory, setRowNewCategory] = useState<{[i:number]: string}>({});
+  const [rowNewSupplier, setRowNewSupplier] = useState<{[i:number]: string}>({});
 
   // Category store
   const categories = useCategoryStore(state => state.categories);
@@ -178,12 +183,13 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
       const row = csvData[i];
       // Find rule for row
       const matchedRule = getMatchedRule(row);
-      const category = matchedRule?.category || selectedCategory || "okategoriserad";
-      const supplier = matchedRule?.supplier || selectedSupplier || "okänd";
+      // Per-row kategori/leverantör
+      const category = rowCategory[i] || matchedRule?.category || selectedCategory || "okategoriserad";
+      const supplier = rowSupplier[i] || matchedRule?.supplier || selectedSupplier || "okänd";
       return {
         name: row[fieldMapping.description] || row["Beskrivning"] || "",
         amount: Number(row[fieldMapping.amount] || row["Belopp"] || 0),
-        type: "expense",
+        type: 'expense' as 'expense',
         category,
         supplier,
         note: row[fieldMapping.reference] || row["Referens"] || "",
@@ -459,10 +465,91 @@ const ImportCsvModal: React.FC<ImportCsvModalProps> = ({ open, onClose }) => {
                               style={duplicate ? { opacity: 0.5, pointerEvents: "none" } : {}}
                             />
                           </td>
-                          {/* Only show columns that are mapped to an internal field */}
                           {csvHeaders.filter(col => fieldMapping[col]).map((col) => (
                             <td key={col} className="border px-2 py-1">{row[col]}</td>
                           ))}
+                          {/* Per-row kategori */}
+                          <td className="border px-2 py-1">
+                            <div className="flex items-center gap-1">
+                              <select
+                                className="border rounded px-2 py-1"
+                                value={rowCategory[i] || ""}
+                                onChange={e => setRowCategory(rc => ({...rc, [i]: e.target.value}))}
+                              >
+                                <option value="">Välj kategori</option>
+                                {categories.map(cat => (
+                                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                              </select>
+                              <input
+                                type="text"
+                                className="border rounded px-2 py-1 w-20"
+                                value={rowNewCategory[i] || ""}
+                                onChange={e => setRowNewCategory(rnc => ({...rnc, [i]: e.target.value}))}
+                                placeholder="Ny kategori"
+                              />
+                              <button
+                                className="px-2 py-1 bg-blue-600 text-white rounded"
+                                onClick={async () => {
+                                  const name = (rowNewCategory[i]||"").trim();
+                                  if (!name) return;
+                                  await addCategory(name);
+                                  await fetchCategories();
+                                  // Välj senaste kategori
+                                  const latestCat = categories[categories.length-1];
+                                  if (latestCat) {
+                                    setRowCategory(rc => ({...rc, [i]: latestCat.id}));
+                                  }
+                                  setRowNewCategory(rnc => ({...rnc, [i]: ""}));
+                                }}
+                                disabled={!rowNewCategory[i]}
+                              >+
+                              </button>
+                            </div>
+                          </td>
+                          {/* Per-row leverantör */}
+                          <td className="border px-2 py-1">
+                            <div className="flex items-center gap-1">
+                              <select
+                                className="border rounded px-2 py-1"
+                                value={rowSupplier[i] || ""}
+                                onChange={e => setRowSupplier(rs => ({...rs, [i]: e.target.value}))}
+                                disabled={!rowCategory[i]}
+                              >
+                                <option value="">Välj leverantör</option>
+                                {suppliers.filter(sup => sup.categoryId === rowCategory[i]).map(sup => (
+                                  <option key={sup.id} value={sup.id}>{sup.name}</option>
+                                ))}
+                              </select>
+                              <input
+                                type="text"
+                                className="border rounded px-2 py-1 w-20"
+                                value={rowNewSupplier[i] || ""}
+                                onChange={e => setRowNewSupplier(rns => ({...rns, [i]: e.target.value}))}
+                                placeholder="Ny leverantör"
+                                disabled={!rowCategory[i]}
+                              />
+                              <button
+                                className="px-2 py-1 bg-blue-600 text-white rounded"
+                                onClick={async () => {
+                                  const name = (rowNewSupplier[i]||"").trim();
+                                  const catId = rowCategory[i];
+                                  if (!name || !catId) return;
+                                  await addSupplier(name, catId);
+                                  await fetchSuppliers();
+                                  // Välj senaste leverantör för kategori
+                                  const filtered = suppliers.filter(sup => sup.categoryId === catId);
+                                  const latestSup = filtered[filtered.length-1];
+                                  if (latestSup) {
+                                    setRowSupplier(rs => ({...rs, [i]: latestSup.id}));
+                                  }
+                                  setRowNewSupplier(rns => ({...rns, [i]: ""}));
+                                }}
+                                disabled={!rowNewSupplier[i] || !rowCategory[i]}
+                              >+
+                              </button>
+                            </div>
+                          </td>
                           <td className="border px-2 py-1 text-xs">
                             {duplicate ? <span className="text-red-600">Dubblett</span> : <span className="text-green-600">OK</span>}
                           </td>
