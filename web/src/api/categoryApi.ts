@@ -1,13 +1,32 @@
+
 import axios from './axios';
 
 export const categoryApi = {
-  getCategories: async () => {
-    const res = await axios.get('/categories');
-    console.log('getCategories response', res.data);
-    return res.data;
+  /**
+   * Hämta alla kategorier för inloggad användare
+   */
+  async getCategories() {
+    try {
+      const res = await axios.get('/categories');
+      console.log('[categoryApi] getCategories:', res.data);
+      return res.data;
+    } catch (err) {
+      console.error('[categoryApi] getCategories error:', err);
+      throw err;
+    }
   },
-  createCategory: async (name: string) => {
-    const res = await axios.post('/categories', { name });
-    return res.data;
+
+  /**
+   * Skapa ny kategori för användare
+   */
+  async createCategory(name: string) {
+    try {
+      const res = await axios.post('/categories', { name });
+      console.log('[categoryApi] createCategory:', res.data);
+      return res.data;
+    } catch (err) {
+      console.error('[categoryApi] createCategory error:', err);
+      throw err;
+    }
   },
 };

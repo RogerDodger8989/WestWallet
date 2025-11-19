@@ -9,26 +9,26 @@ export class SuppliersService {
     @InjectModel(Supplier.name) private readonly supplierModel: Model<SupplierDocument>,
   ) {}
 
-  async create(name: string, categoryId: string): Promise<SupplierDocument> {
+  async create(name: string, categoryId: string, userId: string): Promise<SupplierDocument> {
     try {
       if (!name || !categoryId) {
         console.error('Missing name or categoryId:', { name, categoryId });
         throw new BadRequestException('Namn och kategori måste anges');
       }
       // Dublettkontroll: returnera existerande om exakt samma finns
-      const exists = await this.supplierModel.findOne({ name, categoryId });
+      const exists = await this.supplierModel.findOne({ name, categoryId, userId });
       if (exists) {
         console.log('Supplier already exists, returning existing:', exists);
         return exists;
       }
       // Generera displayId
-      const last = await this.supplierModel.findOne().sort({ displayId: -1 });
+      const last = await this.supplierModel.findOne({ userId }).sort({ displayId: -1 });
       let nextId = 'S000001';
       if (last && last.displayId) {
         const num = parseInt(last.displayId.slice(1)) + 1;
         nextId = 'S' + num.toString().padStart(6, '0');
       }
-      const supplier = new this.supplierModel({ name, categoryId, displayId: nextId });
+      const supplier = new this.supplierModel({ name, categoryId, displayId: nextId, userId });
       const saved = await supplier.save();
       console.log('Supplier created:', saved);
       return saved;
@@ -38,19 +38,19 @@ export class SuppliersService {
     }
   }
 
-  async findAll(categoryId?: string): Promise<SupplierDocument[]> {
+  async findAll(userId: string, categoryId?: string): Promise<SupplierDocument[]> {
     if (categoryId) {
-      return this.supplierModel.find({ categoryId }).exec();
+      return this.supplierModel.find({ userId, categoryId }).exec();
     }
-    return this.supplierModel.find().exec();
+    return this.supplierModel.find({ userId }).exec();
   }
 
-  async findById(id: string): Promise<SupplierDocument | null> {
-    return this.supplierModel.findById(id).exec();
+  async findById(id: string, userId: string): Promise<SupplierDocument | null> {
+    return this.supplierModel.findOne({ _id: id, userId }).exec();
   }
 
-  async update(id: string, name: string, categoryId: string): Promise<SupplierDocument> {
-    const sup = await this.supplierModel.findById(id);
+  async update(id: string, name: string, categoryId: string, userId: string): Promise<SupplierDocument> {
+    const sup = await this.supplierModel.findOne({ _id: id, userId });
     if (!sup) {
       throw new NotFoundException('Supplier not found');
     }
@@ -62,7 +62,7 @@ export class SuppliersService {
     return this.supplierModel.find({ category }).exec();
   }
 
-  async delete(id: string): Promise<void> {
-    await this.supplierModel.findByIdAndDelete(id);
+  async delete(id: string, userId: string): Promise<void> {
+    await this.supplierModel.findOneAndDelete({ _id: id, userId });
   }
 }

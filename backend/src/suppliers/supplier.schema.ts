@@ -5,6 +5,8 @@ export type SupplierDocument = Supplier & Document;
 
 @Schema()
 export class Supplier {
+    @Prop({ required: true, index: true })
+    userId: string;
   @Prop({ required: true })
   name: string;
 

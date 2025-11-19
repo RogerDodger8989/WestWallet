@@ -13,6 +13,34 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const authHeader: string | undefined =
       request.headers?.authorization || request.headers?.Authorization;
 
+    // Debug: logga inkommande JWT-token
+    if (authHeader && typeof authHeader === 'string') {
+      const token = authHeader.split(' ')[1];
+      if (token) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.decode(token);
+          console.log('[JwtAuthGuard] JWT Debug:', { token, decoded });
+        } catch (err) {
+          console.log('[JwtAuthGuard] Misslyckades att decoda token', err);
+        }
+      }
+    }
+
+    // Debug: logga inkommande JWT-token
+    if (authHeader && typeof authHeader === 'string') {
+      const token = authHeader.split(' ')[1];
+      if (token) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.decode(token);
+          console.log('JWT Debug:', { token, decoded });
+        } catch (err) {
+          console.log('JWT Debug: Misslyckades att decoda token', err);
+        }
+      }
+    }
+
     if (authHeader && typeof authHeader === 'string') {
       const parts = authHeader.split(' ');
       const token = parts.length === 2 ? parts[1] : null;

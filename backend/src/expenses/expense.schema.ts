@@ -5,6 +5,8 @@ export type ExpenseDocument = Expense & Document;
 
 @Schema()
 export class Expense {
+    @Prop({ required: true, index: true })
+    userId: string;
   @Prop({ required: true })
   name: string;
 

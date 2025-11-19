@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Param, UploadedFiles, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, UploadedFiles, UseInterceptors, BadRequestException, Req } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { imageConfig } from '../config/image.config';
@@ -13,6 +13,7 @@ export class ImagesController {
   @Post()
   @UseInterceptors(FilesInterceptor('images'))
   async uploadImages(
+    @Req() req,
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
     @Param('category') category?: string
@@ -26,7 +27,7 @@ export class ImagesController {
     // Hämta displayId för posten
     let displayId = id;
     try {
-      const expense = await this.expensesService.findById(id);
+      const expense = await this.expensesService.findById(id, req.user.userId);
       if (expense && expense.displayId) displayId = expense.displayId;
     } catch {}
     const dir = path.join(basePath, displayId);
@@ -63,7 +64,7 @@ export class ImagesController {
   }
 
   @Get()
-  async getImages(@Param('id') id: string, @Param('category') category?: string) {
+  async getImages(@Req() req, @Param('id') id: string, @Param('category') category?: string) {
     let basePath = imageConfig.localPath;
     if (category) {
       const cat = imageCategories.find(c => c.key === category);
@@ -72,7 +73,7 @@ export class ImagesController {
     // Hämta displayId för posten
     let displayId = id;
     try {
-      const expense = await this.expensesService.findById(id);
+      const expense = await this.expensesService.findById(id, req.user.userId);
       if (expense && expense.displayId) displayId = expense.displayId;
     } catch {}
     const dir = path.join(basePath, displayId);
@@ -82,7 +83,7 @@ export class ImagesController {
   }
 
   @Delete(':imageId')
-  async deleteImage(@Param('id') id: string, @Param('imageId') imageId: string, @Param('category') category?: string) {
+  async deleteImage(@Req() req, @Param('id') id: string, @Param('imageId') imageId: string, @Param('category') category?: string) {
     let basePath = imageConfig.localPath;
     if (category) {
       const cat = imageCategories.find(c => c.key === category);
@@ -91,7 +92,7 @@ export class ImagesController {
     // Hämta displayId för posten
     let displayId = id;
     try {
-      const expense = await this.expensesService.findById(id);
+      const expense = await this.expensesService.findById(id, req.user.userId);
       if (expense && expense.displayId) displayId = expense.displayId;
     } catch {}
     const filepath = path.join(basePath, displayId, imageId);

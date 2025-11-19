@@ -4,10 +4,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // DEBUG: Skriv ut alla miljövariabler vid uppstart
+  console.log('DEBUG ENV:', JSON.stringify(process.env, null, 2));
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: 'http://localhost:3001',
-    credentials: true,
+    credentials: false,
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
   // Konfigurera Swagger

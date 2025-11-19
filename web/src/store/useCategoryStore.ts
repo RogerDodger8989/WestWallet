@@ -41,13 +41,15 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       set({ loading: true, error: '' });
       try {
         const response = await categoryApi.createCategory(name);
-        console.log('addCategory backend response', response);
+        console.log('[useCategoryStore] addCategory:', response);
         await get().fetchCategories();
         set({ loading: false });
         return response;
       } catch (error: any) {
-        set({ error: error.message || 'Kunde inte skapa kategori', loading: false });
+        const msg = error?.response?.data?.message || error.message || 'Kunde inte skapa kategori';
+        set({ error: msg, loading: false });
+        alert(msg);
         return null;
       }
-  }
+    },
 }));

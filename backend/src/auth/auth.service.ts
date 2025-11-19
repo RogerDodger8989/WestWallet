@@ -99,7 +99,7 @@ export class AuthService {
       throw new BadRequestException('Ogiltig eller föråldrad token');
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();

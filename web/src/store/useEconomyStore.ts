@@ -1,4 +1,6 @@
+
 import { create } from 'zustand';
+import { economyApi } from '../api/economyApi';
 
 export interface EconomyItem {
   id: string;
@@ -41,7 +43,7 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
   fetchItems: async () => {
     set({ loading: true, error: '' });
     try {
-      const items = await import('../api/economyApi').then(api => api.fetchEconomyItems());
+      const items = await economyApi.fetchEconomyItems();
       set({ items, loading: false });
     } catch (err: any) {
       set({ error: err.message || 'Kunde inte hämta poster', loading: false });
@@ -50,7 +52,7 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
   addItem: async (item) => {
     set({ loading: true, error: '' });
     try {
-      const newItem = await import('../api/economyApi').then(api => api.addEconomyItem(item));
+      const newItem = await economyApi.addEconomyItem(item);
       set({ items: [...get().items, newItem], loading: false });
     } catch (err: any) {
       set({ error: err.message || 'Kunde inte spara post', loading: false });
@@ -59,7 +61,7 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
   updateItem: async (item) => {
     set({ loading: true, error: '' });
     try {
-      const updated = await import('../api/economyApi').then(api => api.updateEconomyItem(item));
+      const updated = await economyApi.updateEconomyItem(item);
       set({ items: get().items.map(i => i.id === updated.id ? updated : i), loading: false });
     } catch (err: any) {
       set({ error: err.message || 'Kunde inte uppdatera post', loading: false });
@@ -68,7 +70,7 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
   deleteItem: async (id) => {
     set({ loading: true, error: '' });
     try {
-      await import('../api/economyApi').then(api => api.deleteEconomyItem(id));
+      await economyApi.deleteEconomyItem(id);
       set({ items: get().items.filter(i => i.id !== id), loading: false });
     } catch (err: any) {
       set({ error: err.message || 'Kunde inte radera post', loading: false });
@@ -77,9 +79,8 @@ export const useEconomyStore = create<EconomyState>((set, get) => ({
   restoreItem: async (item) => {
     set({ loading: true, error: '' });
     try {
-      // Skicka både id och _id till backend
       const restorePayload = { ...item, _id: item.id };
-      const restored = await import('../api/economyApi').then(api => api.restoreEconomyItem(restorePayload));
+      const restored = await economyApi.restoreEconomyItem(restorePayload);
       set({ items: [...get().items, restored], loading: false });
     } catch (err: any) {
       set({ error: err.message || 'Kunde inte återställa post', loading: false });

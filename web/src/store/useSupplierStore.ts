@@ -40,18 +40,21 @@ export const useSupplierStore = create<SupplierState>((set, get) => ({
       set({ error: error.message || 'Kunde inte hämta leverantörer', loading: false });
     }
   },
-    addSupplier: async (name, categoryId) => {
+  addSupplier: async (name, categoryId) => {
     set({ loading: true, error: '' });
     try {
-        const res = await supplierApi.createSupplier(name, categoryId);
+      const res = await supplierApi.createSupplier(name, categoryId);
       if (res.statusCode === 400) {
         set({ error: res.message || 'Dublettleverantör', loading: false });
+        alert(res.message || 'Dublettleverantör');
         return;
       }
       await get().fetchSuppliers();
       set({ loading: false });
     } catch (error: any) {
-      set({ error: error.response?.data?.message || error.message || 'Kunde inte skapa leverantör', loading: false });
+      const msg = error?.response?.data?.message || error.message || 'Kunde inte skapa leverantör';
+      set({ error: msg, loading: false });
+      alert(msg);
     }
   },
 }));

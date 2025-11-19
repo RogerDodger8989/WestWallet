@@ -12,26 +12,26 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
   login: async (email, password, navigate) => {
     set({ isLoading: true });
-    await new Promise(res => setTimeout(res, 1000));
-    if (
-      (email === 'admin@westwallet.se' && password === 'admin') ||
-      (email === 'dennis800121@gmail.com' && password === 'lottasas123')
-    ) {
-      const user = { id: '1', name: 'Admin', email, role: 'admin' };
-      set({ user, isLoading: false });
-      localStorage.setItem('authUser', JSON.stringify(user));
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) throw new Error('Fel e-post eller lösenord');
+      const data = await res.json();
+      localStorage.setItem('accessToken', data.access_token);
+      set({ user: data.user, isLoading: false });
+      localStorage.setItem('authUser', JSON.stringify(data.user));
       if (navigate) navigate('/admin/dashboard');
-    } else if (email === 'user@westwallet.se' && password === 'user') {
-      const user = { id: '2', name: 'User', email, role: 'user' };
-      set({ user, isLoading: false });
-      localStorage.setItem('authUser', JSON.stringify(user));
-    } else {
+    } catch (err) {
       set({ isLoading: false });
-      throw new Error('Fel e-post eller lösenord');
+      throw err;
     }
   },
   logout: () => {
     set({ user: null });
     localStorage.removeItem('authUser');
+    localStorage.removeItem('accessToken');
   },
 }));

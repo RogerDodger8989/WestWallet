@@ -1,9 +1,11 @@
 
-import { Controller, Get, Post, Body, Param, Delete, Put, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, Query, Inject, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ExpensesService } from './expenses.service';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 
+@UseGuards(JwtAuthGuard)
 @Controller('expenses')
 export class ExpensesController {
   constructor(
@@ -13,15 +15,17 @@ export class ExpensesController {
   ) {}
 
   @Post('restore')
-  async restore(@Body() body: any) {
-    return this.expensesService.restore(body);
+  async restore(@Req() req, @Body() body: any) {
+    console.log('[ExpensesController] req.user:', req.user);
+    return this.expensesService.restore(body, req.user.userId);
   }
 
   // Offline sync: returnera ändrade poster sedan timestamp
   @Get('sync')
-  async sync(@Query('since') since: string) {
+  async sync(@Req() req, @Query('since') since: string) {
+    console.log('[ExpensesController] req.user:', req.user);
     const date = since ? new Date(since) : new Date(0);
-    return this.expensesService.findChangedSince(date);
+    return this.expensesService.findChangedSince(date, req.user.userId);
   }
 
   // Hämta auditlogg för utgifter
@@ -36,38 +40,40 @@ export class ExpensesController {
 
   // Statistik: summera utgifter per kategori och månad
   @Get('stats/:year')
-  async getStats(@Param('year') year: number) {
-    return this.expensesService.getStatsByCategoryAndMonth(year);
+  async getStats(@Req() req, @Param('year') year: number) {
+    return this.expensesService.getStatsByCategoryAndMonth(year, req.user.userId);
   }
 
   @Post()
-  async create(@Body() body: any) {
-    return this.expensesService.create(body);
+  async create(@Req() req, @Body() body: any) {
+    // Lägg till userId från JWT
+    return this.expensesService.create({ ...body, userId: req.user.userId });
   }
 
   @Get()
-  async findAll() {
-    return this.expensesService.findAll();
+  async findAll(@Req() req) {
+    console.log('[ExpensesController] req.user:', req.user);
+    return this.expensesService.findAll(req.user.userId);
   }
 
   @Get('year/:year')
-  async findByYear(@Param('year') year: number) {
-    return this.expensesService.findByYear(year);
+  async findByYear(@Req() req, @Param('year') year: number) {
+    return this.expensesService.findByYear(year, req.user.userId);
   }
 
   @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.expensesService.findById(id);
+  async findById(@Req() req, @Param('id') id: string) {
+    return this.expensesService.findById(id, req.user.userId);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
-    return this.expensesService.update(id, body);
+  async update(@Req() req, @Param('id') id: string, @Body() body: any) {
+    return this.expensesService.update(id, body, req.user.userId);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    await this.expensesService.delete(id);
+  async delete(@Req() req, @Param('id') id: string) {
+    await this.expensesService.delete(id, req.user.userId);
     return { message: 'Utgift borttagen' };
   }
 }

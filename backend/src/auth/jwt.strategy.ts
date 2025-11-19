@@ -10,13 +10,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: jwtConstants.secret,
+      secretOrKey: process.env.JWT_SECRET || '',
     });
   }
 
   async validate(payload: any) {
+      // Logga ut aktuell JWT_SECRET för felsökning
+      console.log('[DEBUG] process.env.JWT_SECRET:', process.env.JWT_SECRET);
+    // Debug: logga payload och användare
+    console.log('[JWT Strategy] Payload:', payload);
     const user = await this.usersService.findById(payload.sub);
-
+    if (!user) {
+      console.log('[JWT Strategy] Ingen användare hittades för sub:', payload.sub);
+    }
+    if (user && !user.isVerified) {
+      console.log('[JWT Strategy] Användaren är inte verifierad:', user.email);
+    }
     return {
       userId: payload.sub,
       email: payload.email,

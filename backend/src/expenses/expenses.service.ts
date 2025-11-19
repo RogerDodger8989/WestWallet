@@ -7,13 +7,13 @@ import { Expense, ExpenseDocument } from './expense.schema';
 @Injectable()
 export class ExpensesService {
       // Offline sync: hämta utgifter ändrade sedan viss tidpunkt
-      async findChangedSince(since: Date): Promise<ExpenseDocument[]> {
-        return this.expenseModel.find({ updatedAt: { $gte: since } }).exec();
+      async findChangedSince(since: Date, userId: string): Promise<ExpenseDocument[]> {
+        return this.expenseModel.find({ updatedAt: { $gte: since }, userId }).exec();
       }
     // Statistik: summera utgifter per kategori och månad
-    async getStatsByCategoryAndMonth(year: number) {
+    async getStatsByCategoryAndMonth(year: number, userId: string) {
       const stats = await this.expenseModel.aggregate([
-        { $match: { year } },
+        { $match: { year, userId } },
         { $group: {
             _id: { category: '$category', month: '$month' },
             total: { $sum: '$amount' },
@@ -26,10 +26,10 @@ export class ExpensesService {
       this.wsGateway?.sendEvent('dashboardStats', { year, stats });
       return stats;
     }
-  async restore(body: any): Promise<ExpenseDocument | null> {
+  async restore(body: any, userId: string): Promise<ExpenseDocument | null> {
     // Exempel: återställ en post genom att sätta isDeleted = false
     if (!body.id) throw new NotFoundException('ID saknas');
-    return this.expenseModel.findByIdAndUpdate(body.id, { isDeleted: false }, { new: true }).exec();
+    return this.expenseModel.findOneAndUpdate({ _id: body.id, userId }, { isDeleted: false }, { new: true }).exec();
   }
   constructor(
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
@@ -40,7 +40,7 @@ export class ExpensesService {
   async create(data: Partial<Expense>): Promise<ExpenseDocument> {
     // Generera displayId som löpnummer med prefix 'A' och fem siffror
     if (!data.displayId) {
-      const last = await this.expenseModel.findOne({}, {}, { sort: { displayId: -1 } });
+      const last = await this.expenseModel.findOne({ userId: data.userId }, {}, { sort: { displayId: -1 } });
       let nextNum = 1;
       if (last && last.displayId && /^A\d{5}$/.test(last.displayId)) {
         nextNum = parseInt(last.displayId.slice(1), 10) + 1;
@@ -59,8 +59,8 @@ export class ExpensesService {
     return doc;
   }
 
-  async findAll(): Promise<ExpenseDocument[]> {
-    const items = await this.expenseModel.find().exec();
+  async findAll(userId: string): Promise<ExpenseDocument[]> {
+    const items = await this.expenseModel.find({ userId }).exec();
     // Use import for imageConfig
     // Fallback to defaultPath if localPath is undefined
     const { imageConfig } = require('../config/image.config');
@@ -79,16 +79,16 @@ export class ExpensesService {
     });
   }
 
-  async findByYear(year: number): Promise<ExpenseDocument[]> {
-    return this.expenseModel.find({ year }).exec();
+  async findByYear(year: number, userId: string): Promise<ExpenseDocument[]> {
+    return this.expenseModel.find({ year, userId }).exec();
   }
 
-  async findById(id: string): Promise<ExpenseDocument | null> {
-    return this.expenseModel.findById(id).exec();
+  async findById(id: string, userId: string): Promise<ExpenseDocument | null> {
+    return this.expenseModel.findOne({ _id: id, userId }).exec();
   }
 
-  async update(id: string, data: Partial<Expense>): Promise<ExpenseDocument> {
-    const exp = await this.expenseModel.findById(id);
+  async update(id: string, data: Partial<Expense>, userId: string): Promise<ExpenseDocument> {
+    const exp = await this.expenseModel.findOne({ _id: id, userId });
     if (!exp) {
       const error: any = new NotFoundException('Utgift hittades inte');
       error.errorCode = 'EXPENSE_NOT_FOUND';
@@ -108,8 +108,8 @@ export class ExpensesService {
     return updated;
   }
 
-  async delete(id: string): Promise<void> {
-    const doc = await this.expenseModel.findByIdAndDelete(id);
+  async delete(id: string, userId: string): Promise<void> {
+    const doc = await this.expenseModel.findOneAndDelete({ _id: id, userId });
     await this.auditLogService?.log({
       action: 'delete',
       model: 'Expense',

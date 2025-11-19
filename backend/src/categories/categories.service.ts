@@ -9,30 +9,30 @@ export class CategoriesService {
     @InjectModel(Category.name) private readonly categoryModel: Model<CategoryDocument>,
   ) {}
 
-  async create(name: string): Promise<CategoryDocument> {
+  async create(name: string, userId: string): Promise<CategoryDocument> {
     // Dublettkontroll
-    const exists = await this.categoryModel.findOne({ name });
+    const exists = await this.categoryModel.findOne({ name, userId });
     if (exists) throw new BadRequestException('Kategori finns redan');
     // Generera displayId
-    const last = await this.categoryModel.findOne().sort({ displayId: -1 });
+    const last = await this.categoryModel.findOne({ userId }).sort({ displayId: -1 });
     let nextId = 'A000001';
     if (last && last.displayId) {
       const num = parseInt(last.displayId.slice(1)) + 1;
       nextId = 'A' + num.toString().padStart(6, '0');
     }
-    return new this.categoryModel({ name, displayId: nextId }).save();
+    return new this.categoryModel({ name, displayId: nextId, userId }).save();
   }
 
-  async findAll(): Promise<CategoryDocument[]> {
-    return this.categoryModel.find().exec();
+  async findAll(userId: string): Promise<CategoryDocument[]> {
+    return this.categoryModel.find({ userId }).exec();
   }
 
-  async findById(id: string): Promise<CategoryDocument | null> {
-    return this.categoryModel.findById(id).exec();
+  async findById(id: string, userId: string): Promise<CategoryDocument | null> {
+    return this.categoryModel.findOne({ _id: id, userId }).exec();
   }
 
-  async update(id: string, name: string): Promise<CategoryDocument> {
-    const cat = await this.categoryModel.findById(id);
+  async update(id: string, name: string, userId: string): Promise<CategoryDocument> {
+    const cat = await this.categoryModel.findOne({ _id: id, userId });
     if (!cat) {
       const error: any = new NotFoundException('Kategori hittades inte');
       error.errorCode = 'CATEGORY_NOT_FOUND';
@@ -42,7 +42,7 @@ export class CategoriesService {
     return cat.save();
   }
 
-  async delete(id: string): Promise<void> {
-    await this.categoryModel.findByIdAndDelete(id);
+  async delete(id: string, userId: string): Promise<void> {
+    await this.categoryModel.findOneAndDelete({ _id: id, userId });
   }
 }

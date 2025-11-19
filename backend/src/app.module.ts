@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { RuleEntity } from './rule.entity';
 import { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { imageConfig } from './config/image.config';
@@ -56,12 +58,19 @@ dotenv.config();
       MongooseModule.forRoot(
         process.env.MONGODB_URI || 'mongodb://localhost:27017/westwallet',
       ),
-      AuthModule,
-      UsersModule,
-      EmailModule,
-      MongooseModule.forFeature([
-        { name: 'Rule', schema: RuleSchema },
-      ]),
+        TypeOrmModule.forRoot({
+          type: 'sqlite', // Byt till din databas om du vill
+          database: 'data.sqlite',
+          entities: [RuleEntity],
+          synchronize: true,
+        }),
+        TypeOrmModule.forFeature([RuleEntity]),
+        AuthModule,
+        UsersModule,
+        EmailModule,
+        MongooseModule.forFeature([
+          { name: 'Rule', schema: RuleSchema },
+        ]),
       MJMLModule,
       CategoriesModule,
       ExpensesModule,
